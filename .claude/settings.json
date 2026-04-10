@@ -7,14 +7,18 @@
       "Grep",
       "Edit",
       "Write",
+
       "Bash(pnpm:*)",
       "Bash(npx:*)",
       "Bash(tsx:*)",
       "Bash(node:*)",
       "Bash(npm:*)",
+
       "Bash(psql:*)",
       "Bash(pg_dump:*)",
+      "Bash(pg_isready:*)",
       "Bash(brew:*)",
+
       "Bash(ls:*)",
       "Bash(mkdir:*)",
       "Bash(cp:*)",
@@ -23,8 +27,17 @@
       "Bash(file:*)",
       "Bash(stat:*)",
       "Bash(which:*)",
+      "Bash(sleep:*)",
+      "Bash(true:*)",
+      "Bash(echo:*)",
+
       "Bash(curl http://localhost:*)",
       "Bash(curl http://127.0.0.1:*)",
+      "Bash(curl -s http://localhost:*)",
+      "Bash(curl -s http://127.0.0.1:*)",
+      "Bash(curl -sS http://localhost:*)",
+      "Bash(curl -sS http://127.0.0.1:*)",
+
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
@@ -38,10 +51,20 @@
       "Bash(git remote:*)",
       "Bash(git fetch:*)",
       "Bash(git pull:*)",
+      "Bash(git config:*)",
+      "Bash(git -C:*)",
+
       "Bash(gh auth status:*)",
       "Bash(gh repo view:*)",
+      "Bash(gh repo list:*)",
       "Bash(gh pr list:*)",
-      "Bash(gh issue list:*)"
+      "Bash(gh pr view:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh api:*)",
+
+      "Bash(cd ~/Code/alm:*)",
+      "Bash(cd /Users/manuelhauer/Code/alm:*)"
     ],
     "ask": [
       "Bash(git push:*)",
@@ -50,7 +73,9 @@
       "Bash(rm:*)",
       "Bash(brew uninstall:*)",
       "Bash(psql:*DROP*)",
-      "Bash(pg_dump:*DROP*)"
+      "Bash(pg_dump:*DROP*)",
+      "Bash(gh repo delete:*)",
+      "Bash(gh pr merge:*)"
     ],
     "deny": [
       "Bash(rm -rf /:*)",
