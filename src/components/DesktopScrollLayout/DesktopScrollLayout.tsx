@@ -15,12 +15,11 @@
  *   6. Text-only entries show blank/light grey on the left
  *
  * Implementation notes:
- *   - Focus detection uses IntersectionObserver (the handoff says
- *     scrollend with IO fallback for Safari, but IO is universally
- *     supported now and gives smoother continuous tracking; scrollend
- *     would only fire after the snap completes, which feels laggy).
- *     We watch the right-panel entries and mark whichever has the
- *     largest visible area as focused.
+ *   - Focus detection uses a scroll listener on the right panel.
+ *     A virtual focus line sits 30% down from the panel top; the entry
+ *     whose top edge most recently crossed above that line is focused.
+ *     This is reliable regardless of entry height — short entries always
+ *     win when they're the topmost item below the focus line.
  *   - Per-entry image cycling state is keyed by entry id so it persists
  *     as you scroll back and forth.
  *   - Arrow keys are global (window-level) and route to the focused
@@ -54,38 +53,42 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
     [],
   )
 
-  // ─── Focus detection via IntersectionObserver ──────────────────
-  // Track each entry's visible ratio. The entry with the highest ratio
-  // is the "focused" one. We bias the root margin slightly upward so
-  // an entry counts as focused as it lands at the top of the viewport.
+  // Ref for the right scroll container itself
+  const rightRef = useRef<HTMLElement>(null)
+
+  // ─── Focus detection via scroll position ──────────────────────
+  // We draw a virtual "focus line" 30% down from the top of the right
+  // panel. The focused entry is whichever entry's top edge most recently
+  // crossed above that line — i.e. the last entry whose heading the user
+  // has scrolled past. This works correctly regardless of entry height,
+  // so short entries like single-image or text-only ones can always win.
   useEffect(() => {
-    const ratios = new Map<string, number>()
-    const observer = new IntersectionObserver(
-      (records) => {
-        for (const r of records) {
-          const id = (r.target as HTMLElement).dataset.entryId
-          if (id) ratios.set(id, r.intersectionRatio)
+    const container = rightRef.current
+    if (!container) return
+
+    const updateFocus = () => {
+      const containerRect = container.getBoundingClientRect()
+      const focusLineY = containerRect.top + containerRect.height * 0.3
+
+      let bestId = entries[0]?.id ?? ''
+      let bestTop = -Infinity
+
+      for (const [id, el] of entryRefs.current) {
+        const top = el.getBoundingClientRect().top
+        // Candidate: top is above the focus line but as close to it as possible
+        if (top <= focusLineY && top > bestTop) {
+          bestTop = top
+          bestId = id
         }
-        let bestId = ''
-        let bestRatio = 0
-        for (const [id, ratio] of ratios) {
-          if (ratio > bestRatio) {
-            bestRatio = ratio
-            bestId = id
-          }
-        }
-        if (bestId && bestRatio > 0) setFocusedId(bestId)
-      },
-      {
-        // The right panel itself is the scroll container. We pass
-        // root: null (= the viewport) which works because the right
-        // panel is height: 100vh and pinned to the viewport edge.
-        root: null,
-        threshold: [0, 0.25, 0.5, 0.75, 1],
-      },
-    )
-    for (const el of entryRefs.current.values()) observer.observe(el)
-    return () => observer.disconnect()
+      }
+
+      setFocusedId(bestId)
+    }
+
+    container.addEventListener('scroll', updateFocus, { passive: true })
+    // Run once on mount so the initial state is correct
+    updateFocus()
+    return () => container.removeEventListener('scroll', updateFocus)
   }, [entries])
 
   // ─── Arrow keys cycle the focused entry's images ───────────────
@@ -172,8 +175,8 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
         </div>
       </aside>
 
-      {/* RIGHT — 40% scroll-snap container */}
-      <section className={styles.right}>
+      {/* RIGHT — 40% continuous scroll container */}
+      <section ref={rightRef} className={styles.right}>
         {entries.map((entry) => {
           const isFocused = entry.id === focusedId
           return (
@@ -182,6 +185,16 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
               ref={setEntryRef(entry.id)}
               data-entry-id={entry.id}
               className={`${styles.entry} ${isFocused ? styles.entryFocused : ''}`}
+              onClick={() => {
+                setFocusedId(entry.id)
+                const el = entryRefs.current.get(entry.id)
+                const container = rightRef.current
+                if (!el || !container) return
+                const delta =
+                  el.getBoundingClientRect().top -
+                  (container.getBoundingClientRect().top + container.clientHeight * 0.3)
+                container.scrollBy({ top: delta, behavior: 'smooth' })
+              }}
             >
               <div className={styles.entryNumber}>
                 {String(entry.entryNumber).padStart(3, '0')}

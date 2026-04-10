@@ -4,10 +4,9 @@
  * The hard layout invariants from handoff §M2:
  *   - Left panel 60%, position: sticky top:0, height: 100vh
  *   - Right panel 40%, scroll container
- *   - Right panel scroll-snap-type: y proximity (NOT mandatory — proximity)
- *   - Each entry block scroll-snap-align: start, ~100vh fixed height
- *   - Description overflow stays inside the block (overflow-y: auto),
- *     blocks do NOT grow taller than 100vh
+ *   - Right panel: continuous scroll, no snap
+ *   - Each entry block: natural height, no fixed 100vh constraint
+ *   - Description flows inline, block grows to fit content
  *   - In-focus entry: number orange #E8531E, full opacity
  *   - Out-of-focus entries: opacity 0.4, transition 200ms
  *   - Left image: 300ms opacity crossfade between focused entry's images
@@ -115,14 +114,12 @@
   flex: 0 0 40%;
   height: 100vh;
   overflow-y: auto;
-  scroll-snap-type: y proximity;
+  /* Bottom padding lets the last entry scroll up past the 30% focus line */
+  padding-bottom: 70vh;
   /* No scrollbar styling — let the OS render its native scrollbar */
 }
 
 .entry {
-  height: 100vh;
-  scroll-snap-align: start;
-  /* Inner block CANNOT exceed 100vh — overflow goes inside */
   display: flex;
   flex-direction: column;
   padding: 64px 48px;
@@ -172,9 +169,4 @@
   line-height: 1.6;
   color: #333;
   margin-top: 16px;
-  /* If description is taller than the remaining block space, it scrolls
-     INSIDE the block — the block itself stays at 100vh */
-  flex: 1 1 auto;
-  overflow-y: auto;
-  min-height: 0;
 }
