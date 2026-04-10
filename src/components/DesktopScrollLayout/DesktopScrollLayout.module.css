@@ -1,0 +1,180 @@
+/*
+ * DesktopScrollLayout — M2 prototype styles.
+ *
+ * The hard layout invariants from handoff §M2:
+ *   - Left panel 60%, position: sticky top:0, height: 100vh
+ *   - Right panel 40%, scroll container
+ *   - Right panel scroll-snap-type: y proximity (NOT mandatory — proximity)
+ *   - Each entry block scroll-snap-align: start, ~100vh fixed height
+ *   - Description overflow stays inside the block (overflow-y: auto),
+ *     blocks do NOT grow taller than 100vh
+ *   - In-focus entry: number orange #E8531E, full opacity
+ *   - Out-of-focus entries: opacity 0.4, transition 200ms
+ *   - Left image: 300ms opacity crossfade between focused entry's images
+ *   - Text-only entries: left panel goes blank/light grey
+ */
+
+.root {
+  /* The whole prototype occupies the full viewport. We set min-height
+     so the parent layout's <main> doesn't compress us. */
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  background: #fafaf8;
+  color: #111;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* ─── Left panel (sticky 60%) ──────────────────────────────────── */
+
+.left {
+  flex: 0 0 60%;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  background: #efefea;
+  overflow: hidden;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.leftImageStack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.leftImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  /* 300ms crossfade between focused entry's first image and the next */
+  transition: opacity 300ms ease;
+  pointer-events: none;
+}
+
+.leftImageActive {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.leftEmpty {
+  /* Text-only entry placeholder — light grey, no image */
+  position: absolute;
+  inset: 0;
+  background: #e6e6df;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.leftEmptyActive {
+  opacity: 1;
+}
+
+/* Carousel dots — only shown when focused entry has > 1 image */
+.dots {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  padding: 0;
+  transition: background 200ms ease;
+}
+
+.dotActive {
+  background: #ffffff;
+}
+
+/* ─── Right panel (40% scroll container) ───────────────────────── */
+
+.right {
+  flex: 0 0 40%;
+  height: 100vh;
+  overflow-y: auto;
+  scroll-snap-type: y proximity;
+  /* No scrollbar styling — let the OS render its native scrollbar */
+}
+
+.entry {
+  height: 100vh;
+  scroll-snap-align: start;
+  /* Inner block CANNOT exceed 100vh — overflow goes inside */
+  display: flex;
+  flex-direction: column;
+  padding: 64px 48px;
+  box-sizing: border-box;
+
+  /* Out-of-focus state by default */
+  opacity: 0.4;
+  transition: opacity 200ms ease;
+}
+
+.entryFocused {
+  opacity: 1;
+}
+
+.entryNumber {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: #999;
+  margin-bottom: 24px;
+  font-variant-numeric: tabular-nums;
+  transition: color 200ms ease;
+}
+
+.entryFocused .entryNumber {
+  color: #e8531e; /* alm orange */
+}
+
+.entryHeader {
+  margin-bottom: 16px;
+}
+
+.entryTitle {
+  font-size: 28px;
+  line-height: 1.2;
+  margin: 0 0 8px 0;
+  font-weight: 500;
+}
+
+.entryMeta {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+.entryDescription {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #333;
+  margin-top: 16px;
+  /* If description is taller than the remaining block space, it scrolls
+     INSIDE the block — the block itself stays at 100vh */
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
