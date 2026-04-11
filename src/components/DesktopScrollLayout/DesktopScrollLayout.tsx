@@ -53,6 +53,13 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
   // Blocks the scroll listener while focusEntry's smooth scroll is in flight
   const isProgrammaticScroll = useRef(false)
 
+  // Horizontal wheel accumulator — builds up deltaX across events until
+  // it crosses the threshold, then commits a swipe and enters cooldown
+  const wheelAccumX = useRef(0)
+  const wheelCooldown = useRef(false)
+  // Always holds the latest commitSwipe without re-registering the listener
+  const commitSwipeRef = useRef<(direction: 1 | -1) => void>(() => {})
+
   // Keep dragOffsetRef and state in sync
   const moveDragOffset = useCallback((v: number) => {
     dragOffsetRef.current = v
@@ -75,6 +82,7 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
   useEffect(() => {
     moveDragOffset(0)
     setIsTransitioning(false)
+    wheelAccumX.current = 0
   }, [focusedId, moveDragOffset])
 
   // ─── Focus detection ───────────────────────────────────────────
@@ -137,14 +145,31 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
     return () => window.removeEventListener('keydown', handler)
   }, [focusedId, entries])
 
-  // ─── Forward wheel events from left panel to right panel ───────
+  // ─── Wheel events on left panel ───────────────────────────────
+  // Vertical   → forward to right panel (entry navigation)
+  // Horizontal → image carousel (accumulate deltaX, commit at threshold)
   useEffect(() => {
     const el = leftRef.current
     if (!el) return
     const handler = (e: WheelEvent) => {
+      e.preventDefault()
       if (Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
-        e.preventDefault()
+        // Vertical — drive the right panel
         rightRef.current?.scrollBy({ top: e.deltaY })
+      } else {
+        // Horizontal — carousel
+        if (wheelCooldown.current) return
+        wheelAccumX.current += e.deltaX
+        if (Math.abs(wheelAccumX.current) > 40) {
+          // deltaX positive = swiped right = show prev; negative = next
+          const direction = wheelAccumX.current > 0 ? -1 : 1
+          wheelAccumX.current = 0
+          wheelCooldown.current = true
+          commitSwipeRef.current(direction)
+          setTimeout(() => {
+            wheelCooldown.current = false
+          }, 350)
+        }
       }
     }
     el.addEventListener('wheel', handler, { passive: false })
@@ -161,7 +186,7 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
   const numImages = focusedImages.length
 
   // ─── Commit a swipe past threshold ────────────────────────────
-  // direction: 1 = next (dragged left), -1 = prev (dragged right)
+  // direction: 1 = next (dragged left / scrolled left), -1 = prev (right)
   const commitSwipe = useCallback(
     (direction: 1 | -1) => {
       if (!focusedEntry || focusedEntry.images.length <= 1) return
@@ -186,6 +211,11 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
     },
     [focusedEntry, moveDragOffset],
   )
+
+  // Keep ref current so the wheel handler always calls the latest version
+  useEffect(() => {
+    commitSwipeRef.current = commitSwipe
+  }, [commitSwipe])
 
   // ─── Pointer handlers for left panel drag ─────────────────────
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
