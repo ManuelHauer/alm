@@ -27,17 +27,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import styles from './DesktopScrollLayout.module.css'
-import { mockEntries, type MockEntry } from './mockData'
+import { mockEntries } from './mockData'
+import type { EntryDetail } from '@/types/entry'
 
 type Props = {
-  entries?: MockEntry[]
+  entries?: EntryDetail[]
 }
 
 const wrapIdx = (i: number, len: number): number => ((i % len) + len) % len
 
 export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
-  const [focusedId, setFocusedId] = useState<string>(entries[0]?.id ?? '')
-  const [imageIndices, setImageIndices] = useState<Record<string, number>>({})
+  const [focusedId, setFocusedId] = useState<number>(entries[0]?.id ?? 0)
+  const [imageIndices, setImageIndices] = useState<Record<number, number>>({})
 
   // Visual drag state — triggers re-render for slot positions
   const [dragOffset, setDragOffset] = useState(0)
@@ -70,9 +71,9 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
   }, [])
 
   // DOM refs
-  const entryRefs = useRef<Map<string, HTMLElement>>(new Map())
+  const entryRefs = useRef<Map<number, HTMLElement>>(new Map())
   const setEntryRef = useCallback(
-    (id: string) => (el: HTMLElement | null) => {
+    (id: number) => (el: HTMLElement | null) => {
       if (el) entryRefs.current.set(id, el)
       else entryRefs.current.delete(id)
     },
@@ -98,7 +99,7 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
       const containerRect = container.getBoundingClientRect()
       const focusLineY = containerRect.top + containerRect.height * 0.3
 
-      let bestId = entries[0]?.id ?? ''
+      let bestId = entries[0]?.id ?? 0
       let bestTop = -Infinity
 
       for (const [id, el] of entryRefs.current) {
@@ -118,7 +119,7 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
   }, [entries])
 
   // ─── Focus entry (click / keyboard) ───────────────────────────
-  const focusEntry = useCallback((id: string) => {
+  const focusEntry = useCallback((id: number) => {
     setFocusedId(id)
     const el = entryRefs.current.get(id)
     const container = rightRef.current
@@ -185,7 +186,7 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
     () => entries.find((entry) => entry.id === focusedId) ?? entries[0],
     [entries, focusedId],
   )
-  const focusedImageIndex = imageIndices[focusedEntry?.id ?? ''] ?? 0
+  const focusedImageIndex = imageIndices[focusedEntry?.id ?? 0] ?? 0
   const focusedImages = focusedEntry?.images ?? []
   const numImages = focusedImages.length
 
@@ -318,7 +319,7 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
                   }}
                 >
                   <img
-                    src={focusedImages[prevIdx]?.image.url}
+                    src={focusedImages[prevIdx]?.image.sizes.medium?.url ?? focusedImages[prevIdx]?.image.url}
                     alt={focusedImages[prevIdx]?.image.alt}
                     className={styles.slotImage}
                     draggable={false}
@@ -335,7 +336,7 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
                 }}
               >
                 <img
-                  src={focusedImages[curIdx]?.image.url}
+                  src={focusedImages[curIdx]?.image.sizes.medium?.url ?? focusedImages[curIdx]?.image.url}
                   alt={focusedImages[curIdx]?.image.alt}
                   className={styles.slotImage}
                   draggable={false}
@@ -352,7 +353,7 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
                   }}
                 >
                   <img
-                    src={focusedImages[nextIdx]?.image.url}
+                    src={focusedImages[nextIdx]?.image.sizes.medium?.url ?? focusedImages[nextIdx]?.image.url}
                     alt={focusedImages[nextIdx]?.image.alt}
                     className={styles.slotImage}
                     draggable={false}
