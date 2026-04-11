@@ -52,6 +52,9 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
 
   // Blocks the scroll listener while focusEntry's smooth scroll is in flight
   const isProgrammaticScroll = useRef(false)
+  // Mirrors isTransitioning state so commitSwipe can guard against double-fire
+  // without needing it in deps (would cause stale closure issues)
+  const isTransitioningRef = useRef(false)
 
   // Horizontal wheel accumulator — builds up deltaX across events until
   // it crosses the threshold, then commits a swipe and enters cooldown
@@ -160,15 +163,16 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
         // Horizontal — carousel
         if (wheelCooldown.current) return
         wheelAccumX.current += e.deltaX
-        if (Math.abs(wheelAccumX.current) > 40) {
-          // deltaX positive = swiped right = show prev; negative = next
-          const direction = wheelAccumX.current > 0 ? -1 : 1
+        if (Math.abs(wheelAccumX.current) > 80) {
+          // deltaX positive = fingers moved right = carousel moves right = prev
+          // Inverted: scroll right → next, scroll left → prev
+          const direction = wheelAccumX.current > 0 ? 1 : -1
           wheelAccumX.current = 0
           wheelCooldown.current = true
           commitSwipeRef.current(direction)
           setTimeout(() => {
             wheelCooldown.current = false
-          }, 350)
+          }, 500)
         }
       }
     }
@@ -186,13 +190,15 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
   const numImages = focusedImages.length
 
   // ─── Commit a swipe past threshold ────────────────────────────
-  // direction: 1 = next (dragged left / scrolled left), -1 = prev (right)
+  // direction: 1 = next (dragged/scrolled left), -1 = prev (right)
   const commitSwipe = useCallback(
     (direction: 1 | -1) => {
       if (!focusedEntry || focusedEntry.images.length <= 1) return
+      if (isTransitioningRef.current) return // guard: ignore rapid double-fire
       const panelWidth = leftRef.current?.clientWidth ?? 600
       const flyTo = direction === 1 ? -panelWidth : panelWidth
 
+      isTransitioningRef.current = true
       setIsTransitioning(true)
       moveDragOffset(flyTo)
 
@@ -205,6 +211,7 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
           }
         })
         // Reset without transition — slots are already in final position
+        isTransitioningRef.current = false
         setIsTransitioning(false)
         moveDragOffset(0)
       }, 220)
@@ -352,6 +359,34 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
                   />
                 </div>
               )}
+            </>
+          )}
+
+          {/* Left/right click areas — only when there are multiple images */}
+          {numImages > 1 && (
+            <>
+              <button
+                type="button"
+                className={styles.carouselPrev}
+                onClick={() => commitSwipe(-1)}
+                onPointerDown={(e) => e.stopPropagation()}
+                aria-label="Previous image"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className={styles.carouselNext}
+                onClick={() => commitSwipe(1)}
+                onPointerDown={(e) => e.stopPropagation()}
+                aria-label="Next image"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
             </>
           )}
 

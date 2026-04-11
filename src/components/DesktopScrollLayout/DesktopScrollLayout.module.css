@@ -86,6 +86,48 @@
   text-transform: uppercase;
 }
 
+/* ─── Carousel prev/next click areas ───────────────────────────── */
+
+/* Each button is a full-height strip on the left/right of the panel.
+   Hidden by default; the chevron fades in on hover. A subtle gradient
+   gives the click area a physical edge without being decorative. */
+.carouselPrev,
+.carouselNext {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  padding: 0 20px;
+  cursor: pointer;
+  color: transparent;
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.carouselPrev {
+  left: 0;
+  justify-content: flex-start;
+}
+
+.carouselNext {
+  right: 0;
+  justify-content: flex-end;
+}
+
+.carouselPrev:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.18), transparent);
+}
+
+.carouselNext:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.18), transparent);
+}
+
 /* ─── Carousel dots ─────────────────────────────────────────────── */
 
 .dots {
