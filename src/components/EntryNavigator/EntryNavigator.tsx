@@ -7,19 +7,19 @@
  *   - Owns imgTxtView state (IMG/TXT toggle), passed down to mobile view + BottomNav
  *   - Detects mobile/desktop breakpoint (768px) after hydration
  *   - Desktop: renders DesktopScrollLayout with all entries
- *   - Mobile: renders MobileEntryView (Track B — placeholder for now)
- *   - Handles on-demand entry fetching and URL updates for mobile navigation
+ *   - Mobile: renders MobileEntryView with swipe navigation
+ *   - Tracks currentEntry for mobile URL updates
  *
- * Server components pass pre-fetched entries so the initial render is
- * fully SSR'd. Client-side navigation fetches individual entries via
- * GET /api/entries/[slug] and updates the URL with history.replaceState.
+ * Server components pass pre-fetched entries so the initial render is fully SSR'd.
+ * Mobile navigation uses array lookup (no fetch needed — all entries already loaded).
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import BottomNav from '@/components/BottomNav/BottomNav'
 import DesktopScrollLayout from '@/components/DesktopScrollLayout/DesktopScrollLayout'
 import Header from '@/components/Header/Header'
+import MobileEntryView from '@/components/MobileEntryView/MobileEntryView'
 import type { EntryDetail } from '@/types/entry'
 
 import styles from './EntryNavigator.module.css'
@@ -33,13 +33,11 @@ export default function EntryNavigator({ entries, initialSlug }: Props) {
   const [isMobile, setIsMobile] = useState(false)
   const [imgTxtView, setImgTxtView] = useState<'img' | 'txt'>('img')
 
-  // Current entry — used for mobile navigation and URL management.
+  // Current entry — mobile navigation and URL management.
   // Desktop scroll layout manages its own focus state internally.
   const [currentEntry, setCurrentEntry] = useState<EntryDetail>(
     () => (initialSlug ? (entries.find((e) => e.slug === initialSlug) ?? entries[0]) : entries[0]),
   )
-
-  const isFetching = useRef(false)
 
   // Detect breakpoint after hydration (SSR defaults to desktop)
   useEffect(() => {
@@ -52,32 +50,13 @@ export default function EntryNavigator({ entries, initialSlug }: Props) {
 
   const currentIndex = entries.findIndex((e) => e.slug === currentEntry.slug)
 
-  const navigateToSlug = useCallback(
-    async (slug: string) => {
-      if (isFetching.current || slug === currentEntry.slug) return
-      isFetching.current = true
-      try {
-        const res = await fetch(`/api/entries/${slug}`)
-        if (!res.ok) return
-        const entry: EntryDetail = await res.json()
-        setCurrentEntry(entry)
-        history.replaceState(null, '', `/entry/${slug}`)
-      } finally {
-        isFetching.current = false
-      }
-    },
-    [currentEntry.slug],
-  )
-
-  const goNext = useCallback(() => {
-    const next = entries[(currentIndex + 1) % entries.length]
-    if (next) navigateToSlug(next.slug)
-  }, [currentIndex, entries, navigateToSlug])
-
-  const goPrev = useCallback(() => {
-    const prev = entries[((currentIndex - 1) + entries.length) % entries.length]
-    if (prev) navigateToSlug(prev.slug)
-  }, [currentIndex, entries, navigateToSlug])
+  const handleNavigate = (index: number) => {
+    const entry = entries[index]
+    if (entry) {
+      setCurrentEntry(entry)
+      history.replaceState(null, '', `/entry/${entry.slug}`)
+    }
+  }
 
   const hasImages = currentEntry.images.length > 0
 
@@ -87,16 +66,16 @@ export default function EntryNavigator({ entries, initialSlug }: Props) {
 
       <main className={styles.main}>
         {isMobile ? (
-          // ── MobileEntryView — Track B ──────────────────────────
-          // Placeholder until Track B is implemented.
-          <div className={styles.mobilePlaceholder}>
-            <p>Mobile view — Track B</p>
-            <button type="button" onClick={goPrev}>← prev</button>
-            <span>{currentEntry.title}</span>
-            <button type="button" onClick={goNext}>next →</button>
-          </div>
+          // ── Mobile ────────────────────────────────────────────
+          <MobileEntryView
+            entry={currentEntry}
+            entries={entries}
+            currentIndex={currentIndex}
+            imgTxtView={imgTxtView}
+            onNavigate={handleNavigate}
+          />
         ) : (
-          // ── Desktop layout ─────────────────────────────────────
+          // ── Desktop ───────────────────────────────────────────
           <DesktopScrollLayout entries={entries} />
         )}
       </main>

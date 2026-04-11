@@ -1,15 +1,18 @@
 .root {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100dvh; /* dvh accounts for mobile browser chrome */
   background: #fafaf8;
 }
 
 /* Push content below the fixed 48px header and above the 52px bottom nav */
 .main {
   flex: 1;
+  min-height: 0; /* allows flex child to shrink below content size */
   margin-top: 48px;
   margin-bottom: 52px;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ─── Mobile placeholder (Track B) ─────────────────────────────── */
