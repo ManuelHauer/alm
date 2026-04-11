@@ -1,21 +1,18 @@
 /*
  * DesktopScrollLayout — M2 prototype styles.
  *
- * The hard layout invariants from handoff §M2:
+ * Layout invariants:
  *   - Left panel 60%, position: sticky top:0, height: 100vh
- *   - Right panel 40%, scroll container
- *   - Right panel: continuous scroll, no snap
- *   - Each entry block: natural height, no fixed 100vh constraint
- *   - Description flows inline, block grows to fit content
+ *   - Right panel 40%, continuous scroll container
+ *   - Entry blocks: natural height, no fixed 100vh constraint
  *   - In-focus entry: number orange #E8531E, full opacity
  *   - Out-of-focus entries: opacity 0.4, transition 200ms
- *   - Left image: 300ms opacity crossfade between focused entry's images
- *   - Text-only entries: left panel goes blank/light grey
+ *   - Left panel: 3-slot image carousel (prev / cur / next)
+ *     translated by dragOffset; overflow clipped by .left
+ *   - Text-only entries: .leftEmpty shown, slots not rendered
  */
 
 .root {
-  /* The whole prototype occupies the full viewport. We set min-height
-     so the parent layout's <main> doesn't compress us. */
   display: flex;
   width: 100%;
   min-height: 100vh;
@@ -33,10 +30,19 @@
   top: 0;
   background: #efefea;
   overflow: hidden;
-
+  /* Clips the prev/next carousel slots */
   display: flex;
   align-items: center;
   justify-content: center;
+  user-select: none;
+}
+
+.leftDraggable {
+  cursor: grab;
+}
+
+.leftDraggable:active {
+  cursor: grabbing;
 }
 
 .leftImageStack {
@@ -45,25 +51,29 @@
   height: 100%;
 }
 
-.leftImage {
+/* ─── 3-slot carousel ───────────────────────────────────────────── */
+
+/* Each slot is absolutely positioned and fills the container.
+   The JS sets translateX: calc(-100% + offset), offset, calc(100% + offset)
+   for prev, cur, next. The parent .left clips the overflow. */
+.imageSlot {
   position: absolute;
   inset: 0;
+  will-change: transform;
+}
+
+.slotImage {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0;
-  /* 300ms crossfade between focused entry's first image and the next */
-  transition: opacity 300ms ease;
   pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
-.leftImageActive {
-  opacity: 1;
-  pointer-events: auto;
-}
+/* ─── Text-only empty state ─────────────────────────────────────── */
 
 .leftEmpty {
-  /* Text-only entry placeholder — light grey, no image */
   position: absolute;
   inset: 0;
   background: #e6e6df;
@@ -74,15 +84,10 @@
   font-size: 13px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  opacity: 0;
-  transition: opacity 300ms ease;
 }
 
-.leftEmptyActive {
-  opacity: 1;
-}
+/* ─── Carousel dots ─────────────────────────────────────────────── */
 
-/* Carousel dots — only shown when focused entry has > 1 image */
 .dots {
   position: absolute;
   bottom: 24px;
@@ -116,7 +121,6 @@
   overflow-y: auto;
   /* Bottom padding lets the last entry scroll up past the 30% focus line */
   padding-bottom: 70vh;
-  /* No scrollbar styling — let the OS render its native scrollbar */
 }
 
 .entry {
@@ -124,10 +128,9 @@
   flex-direction: column;
   padding: 64px 48px;
   box-sizing: border-box;
-
-  /* Out-of-focus state by default */
   opacity: 0.4;
   transition: opacity 200ms ease;
+  cursor: default;
 }
 
 .entryFocused {

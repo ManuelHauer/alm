@@ -3,28 +3,25 @@
 /**
  * DesktopScrollLayout — M2 prototype.
  *
- * The hardest UI component in the project, built in isolation per the
- * handoff §M2 strategy ("prove the scroll-snap layout works before
- * building anything else"). Acceptance criteria from §M2:
- *
- *   1. Scroll snaps to entry blocks on the right panel
- *   2. Left image updates when focus changes
- *   3. Out-of-focus entries dim to 0.4 opacity, focused entry full opacity
- *   4. Focused entry number renders alm orange (#E8531E)
- *   5. Multi-image entries show carousel dots, arrow keys cycle
- *   6. Text-only entries show blank/light grey on the left
+ * Acceptance criteria from §M2:
+ *   1. Right panel scrolls continuously to advance entries
+ *   2. Left panel: horizontal pointer drag for image carousel
+ *   3. In-focus entry: number orange (#E8531E), full opacity
+ *   4. Out-of-focus entries: 0.4 opacity, 200ms transition
+ *   5. Multi-image entries: infinite-looping carousel, dots
+ *   6. Text-only entries: blank/light grey left panel
  *
  * Implementation notes:
- *   - Focus detection uses a scroll listener on the right panel.
- *     A virtual focus line sits 30% down from the panel top; the entry
- *     whose top edge most recently crossed above that line is focused.
- *     This is reliable regardless of entry height — short entries always
- *     win when they're the topmost item below the focus line.
- *   - Per-entry image cycling state is keyed by entry id so it persists
- *     as you scroll back and forth.
- *   - Arrow keys are global (window-level) and route to the focused
- *     entry's image cycler. Disabled for entries with ≤ 1 image.
- *   - Hardcoded mock data — see mockData.ts. M3 will swap to real API.
+ *   - Focus detection: scroll listener on right panel, virtual focus
+ *     line at 30% from top. isProgrammaticScroll ref blocks the listener
+ *     during focusEntry scroll so single-click focus is immediate.
+ *   - Image carousel: 3-slot approach (prev / cur / next), all translated
+ *     by dragOffset. On commit, slots fly to ±panelWidth, then index
+ *     updates and offset resets without transition — no visual jump.
+ *   - Infinite loop: wrapIdx = ((i % len) + len) % len. No hard stops.
+ *   - Vertical wheel on left panel is forwarded to the right panel.
+ *   - Axis lock on pointermove: first 6px of movement decides h vs v.
+ *     Vertical drag is released to the browser; horizontal is captured.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -36,14 +33,33 @@ type Props = {
   entries?: MockEntry[]
 }
 
-export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
-  // Which entry currently has the most visible area in the right scroll panel
-  const [focusedId, setFocusedId] = useState<string>(entries[0]?.id ?? '')
+const wrapIdx = (i: number, len: number): number => ((i % len) + len) % len
 
-  // Per-entry carousel index (entries with multiple images)
+export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
+  const [focusedId, setFocusedId] = useState<string>(entries[0]?.id ?? '')
   const [imageIndices, setImageIndices] = useState<Record<string, number>>({})
 
-  // Refs to each entry block in the right panel — populated via callback ref
+  // Visual drag state — triggers re-render for slot positions
+  const [dragOffset, setDragOffset] = useState(0)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+
+  // Drag interaction — refs avoid stale closures in pointer handlers
+  const dragOffsetRef = useRef(0)
+  const dragStartX = useRef(0)
+  const dragStartY = useRef(0)
+  const dragAxis = useRef<'h' | 'v' | null>(null)
+  const isDragging = useRef(false)
+
+  // Blocks the scroll listener while focusEntry's smooth scroll is in flight
+  const isProgrammaticScroll = useRef(false)
+
+  // Keep dragOffsetRef and state in sync
+  const moveDragOffset = useCallback((v: number) => {
+    dragOffsetRef.current = v
+    setDragOffset(v)
+  }, [])
+
+  // DOM refs
   const entryRefs = useRef<Map<string, HTMLElement>>(new Map())
   const setEntryRef = useCallback(
     (id: string) => (el: HTMLElement | null) => {
@@ -52,21 +68,22 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
     },
     [],
   )
-
-  // Ref for the right scroll container itself
   const rightRef = useRef<HTMLElement>(null)
+  const leftRef = useRef<HTMLElement>(null)
 
-  // ─── Focus detection via scroll position ──────────────────────
-  // We draw a virtual "focus line" 30% down from the top of the right
-  // panel. The focused entry is whichever entry's top edge most recently
-  // crossed above that line — i.e. the last entry whose heading the user
-  // has scrolled past. This works correctly regardless of entry height,
-  // so short entries like single-image or text-only ones can always win.
+  // Reset carousel state when focused entry changes
+  useEffect(() => {
+    moveDragOffset(0)
+    setIsTransitioning(false)
+  }, [focusedId, moveDragOffset])
+
+  // ─── Focus detection ───────────────────────────────────────────
   useEffect(() => {
     const container = rightRef.current
     if (!container) return
 
     const updateFocus = () => {
+      if (isProgrammaticScroll.current) return
       const containerRect = container.getBoundingClientRect()
       const focusLineY = containerRect.top + containerRect.height * 0.3
 
@@ -75,7 +92,6 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
 
       for (const [id, el] of entryRefs.current) {
         const top = el.getBoundingClientRect().top
-        // Candidate: top is above the focus line but as close to it as possible
         if (top <= focusLineY && top > bestTop) {
           bestTop = top
           bestId = id
@@ -86,88 +102,242 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
     }
 
     container.addEventListener('scroll', updateFocus, { passive: true })
-    // Run once on mount so the initial state is correct
     updateFocus()
     return () => container.removeEventListener('scroll', updateFocus)
   }, [entries])
 
-  // ─── Arrow keys cycle the focused entry's images ───────────────
+  // ─── Focus entry (click / keyboard) ───────────────────────────
+  const focusEntry = useCallback((id: string) => {
+    setFocusedId(id)
+    const el = entryRefs.current.get(id)
+    const container = rightRef.current
+    if (!el || !container) return
+    const targetTop = Math.max(0, el.offsetTop - container.clientHeight * 0.3)
+    isProgrammaticScroll.current = true
+    container.scrollTo({ top: targetTop, behavior: 'smooth' })
+    setTimeout(() => {
+      isProgrammaticScroll.current = false
+    }, 600)
+  }, [])
+
+  // ─── Arrow keys ────────────────────────────────────────────────
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const focused = entries.find((x) => x.id === focusedId)
+    const handler = (event: KeyboardEvent) => {
+      const focused = entries.find((entry) => entry.id === focusedId)
       if (!focused || focused.images.length <= 1) return
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
-      e.preventDefault()
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+      event.preventDefault()
       setImageIndices((prev) => {
-        const cur = prev[focused.id] ?? 0
-        const len = focused.images.length
-        const next = e.key === 'ArrowRight' ? (cur + 1) % len : (cur - 1 + len) % len
-        return { ...prev, [focused.id]: next }
+        const current = prev[focused.id] ?? 0
+        const direction = event.key === 'ArrowRight' ? 1 : -1
+        return { ...prev, [focused.id]: wrapIdx(current + direction, focused.images.length) }
       })
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [focusedId, entries])
 
-  // ─── Derived state for the left panel ──────────────────────────
+  // ─── Forward wheel events from left panel to right panel ───────
+  useEffect(() => {
+    const el = leftRef.current
+    if (!el) return
+    const handler = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
+        e.preventDefault()
+        rightRef.current?.scrollBy({ top: e.deltaY })
+      }
+    }
+    el.addEventListener('wheel', handler, { passive: false })
+    return () => el.removeEventListener('wheel', handler)
+  }, [])
+
+  // ─── Derived state ─────────────────────────────────────────────
   const focusedEntry = useMemo(
-    () => entries.find((x) => x.id === focusedId) ?? entries[0],
+    () => entries.find((entry) => entry.id === focusedId) ?? entries[0],
     [entries, focusedId],
   )
   const focusedImageIndex = imageIndices[focusedEntry?.id ?? ''] ?? 0
-  const focusedImage = focusedEntry?.images[focusedImageIndex]?.image
+  const focusedImages = focusedEntry?.images ?? []
+  const numImages = focusedImages.length
+
+  // ─── Commit a swipe past threshold ────────────────────────────
+  // direction: 1 = next (dragged left), -1 = prev (dragged right)
+  const commitSwipe = useCallback(
+    (direction: 1 | -1) => {
+      if (!focusedEntry || focusedEntry.images.length <= 1) return
+      const panelWidth = leftRef.current?.clientWidth ?? 600
+      const flyTo = direction === 1 ? -panelWidth : panelWidth
+
+      setIsTransitioning(true)
+      moveDragOffset(flyTo)
+
+      setTimeout(() => {
+        setImageIndices((prev) => {
+          const cur = prev[focusedEntry.id] ?? 0
+          return {
+            ...prev,
+            [focusedEntry.id]: wrapIdx(cur + direction, focusedEntry.images.length),
+          }
+        })
+        // Reset without transition — slots are already in final position
+        setIsTransitioning(false)
+        moveDragOffset(0)
+      }, 220)
+    },
+    [focusedEntry, moveDragOffset],
+  )
+
+  // ─── Pointer handlers for left panel drag ─────────────────────
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    if (e.button !== 0) return
+    dragStartX.current = e.clientX
+    dragStartY.current = e.clientY
+    dragAxis.current = null
+    isDragging.current = true
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }, [])
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLElement>) => {
+      if (!isDragging.current || isTransitioning) return
+      const dx = e.clientX - dragStartX.current
+      const dy = e.clientY - dragStartY.current
+
+      if (dragAxis.current === null) {
+        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+          dragAxis.current = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v'
+        }
+        return
+      }
+
+      if (dragAxis.current === 'h') {
+        if (numImages <= 1) return
+        e.preventDefault()
+        moveDragOffset(dx)
+      }
+    },
+    [isTransitioning, numImages, moveDragOffset],
+  )
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent<HTMLElement>) => {
+      if (!isDragging.current) return
+      isDragging.current = false
+
+      if (dragAxis.current !== 'h' || numImages <= 1) {
+        moveDragOffset(0)
+        return
+      }
+
+      const panelWidth = leftRef.current?.clientWidth ?? 600
+      const threshold = panelWidth * 0.25
+      const offset = dragOffsetRef.current
+
+      if (offset > threshold) {
+        commitSwipe(-1) // dragged right → show prev
+      } else if (offset < -threshold) {
+        commitSwipe(1) // dragged left → show next
+      } else {
+        // Snap back
+        setIsTransitioning(true)
+        moveDragOffset(0)
+        setTimeout(() => setIsTransitioning(false), 220)
+      }
+    },
+    [numImages, commitSwipe, moveDragOffset],
+  )
+
+  // ─── Carousel slot indices ─────────────────────────────────────
+  const curIdx = numImages > 0 ? wrapIdx(focusedImageIndex, numImages) : 0
+  const prevIdx = numImages > 0 ? wrapIdx(focusedImageIndex - 1, numImages) : 0
+  const nextIdx = numImages > 0 ? wrapIdx(focusedImageIndex + 1, numImages) : 0
+  const slotTransition = isTransitioning ? 'transform 220ms ease' : 'none'
 
   // ─── Render ────────────────────────────────────────────────────
   return (
     <div className={styles.root}>
-      {/* LEFT — sticky 60% with crossfading image stack */}
-      <aside className={styles.left} aria-hidden="true">
+      {/* LEFT — sticky 60%, pointer-drag carousel */}
+      <aside
+        ref={leftRef}
+        className={`${styles.left} ${numImages > 1 ? styles.leftDraggable : ''}`}
+        aria-label="Focused entry image gallery"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
         <div className={styles.leftImageStack}>
-          {/* Render every entry's currently-selected image as a stacked
-              layer — only the focused one is opacity:1, others are 0.
-              CSS transitions handle the 300ms crossfade. */}
-          {entries.map((entry) => {
-            const idx = imageIndices[entry.id] ?? 0
-            const img = entry.images[idx]?.image
-            if (!img) return null
-            const isActive = entry.id === focusedId
-            return (
-              <img
-                key={entry.id}
-                src={img.url}
-                alt={img.alt}
-                className={`${styles.leftImage} ${isActive ? styles.leftImageActive : ''}`}
-                loading="lazy"
-              />
-            )
-          })}
+          {numImages === 0 ? (
+            <div className={styles.leftEmpty}>no image</div>
+          ) : (
+            <>
+              {/* Prev slot — only rendered when there are multiple images */}
+              {numImages > 1 && (
+                <div
+                  className={styles.imageSlot}
+                  style={{
+                    transform: `translateX(calc(-100% + ${dragOffset}px))`,
+                    transition: slotTransition,
+                  }}
+                >
+                  <img
+                    src={focusedImages[prevIdx]?.image.url}
+                    alt={focusedImages[prevIdx]?.image.alt}
+                    className={styles.slotImage}
+                    draggable={false}
+                  />
+                </div>
+              )}
 
-          {/* Text-only placeholder — only visible when the focused
-              entry has zero images */}
-          <div
-            className={`${styles.leftEmpty} ${
-              focusedEntry && focusedEntry.images.length === 0
-                ? styles.leftEmptyActive
-                : ''
-            }`}
-          >
-            no image
-          </div>
+              {/* Current slot */}
+              <div
+                className={styles.imageSlot}
+                style={{
+                  transform: `translateX(${dragOffset}px)`,
+                  transition: slotTransition,
+                }}
+              >
+                <img
+                  src={focusedImages[curIdx]?.image.url}
+                  alt={focusedImages[curIdx]?.image.alt}
+                  className={styles.slotImage}
+                  draggable={false}
+                />
+              </div>
 
-          {/* Carousel dots — only when focused entry has > 1 image */}
-          {focusedEntry && focusedEntry.images.length > 1 && (
+              {/* Next slot — only rendered when there are multiple images */}
+              {numImages > 1 && (
+                <div
+                  className={styles.imageSlot}
+                  style={{
+                    transform: `translateX(calc(100% + ${dragOffset}px))`,
+                    transition: slotTransition,
+                  }}
+                >
+                  <img
+                    src={focusedImages[nextIdx]?.image.url}
+                    alt={focusedImages[nextIdx]?.image.alt}
+                    className={styles.slotImage}
+                    draggable={false}
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Carousel dots */}
+          {numImages > 1 && (
             <div className={styles.dots}>
-              {focusedEntry.images.map((_, i) => (
+              {focusedImages.map((_, index) => (
                 <button
-                  key={i}
+                  key={index}
                   type="button"
-                  className={`${styles.dot} ${
-                    i === focusedImageIndex ? styles.dotActive : ''
-                  }`}
+                  className={`${styles.dot} ${index === curIdx ? styles.dotActive : ''}`}
+                  aria-label={`Show image ${index + 1} of ${numImages}`}
+                  aria-pressed={index === curIdx}
                   onClick={() =>
-                    setImageIndices((prev) => ({ ...prev, [focusedEntry.id]: i }))
+                    setImageIndices((prev) => ({ ...prev, [focusedEntry!.id]: index }))
                   }
-                  aria-label={`Show image ${i + 1} of ${focusedEntry.images.length}`}
                 />
               ))}
             </div>
@@ -185,16 +355,13 @@ export default function DesktopScrollLayout({ entries = mockEntries }: Props) {
               ref={setEntryRef(entry.id)}
               data-entry-id={entry.id}
               className={`${styles.entry} ${isFocused ? styles.entryFocused : ''}`}
-              onClick={() => {
-                setFocusedId(entry.id)
-                const el = entryRefs.current.get(entry.id)
-                const container = rightRef.current
-                if (!el || !container) return
-                const delta =
-                  el.getBoundingClientRect().top -
-                  (container.getBoundingClientRect().top + container.clientHeight * 0.3)
-                container.scrollBy({ top: delta, behavior: 'smooth' })
+              onClick={() => focusEntry(entry.id)}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                event.preventDefault()
+                focusEntry(entry.id)
               }}
+              tabIndex={0}
             >
               <div className={styles.entryNumber}>
                 {String(entry.entryNumber).padStart(3, '0')}
