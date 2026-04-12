@@ -77,6 +77,14 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
       const cRect = container.getBoundingClientRect()
       const elRect = el.getBoundingClientRect()
       const offsetInContainer = elRect.top - cRect.top + container.scrollTop
+      // Suppress onActivate while smooth scroll plays out (~500ms covers typical
+      // smooth-scroll duration); prevents intermediate entries from overwriting
+      // the intended active entry and causing flicker / "press twice" symptoms.
+      isProgrammaticScrollRef.current = true
+      clearTimeout(programmaticScrollTimerRef.current)
+      programmaticScrollTimerRef.current = window.setTimeout(() => {
+        isProgrammaticScrollRef.current = false
+      }, 500)
       container.scrollTo({
         top: offsetInContainer - cRect.height * FOCUS_LINE_RATIO,
         behavior: 'smooth',
@@ -127,6 +135,11 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // mount only — no dep on activeEntryId, intentional
 
+  // Guard: suppress onActivate during programmatic smooth scroll triggered
+  // by keyboard nav, preventing intermediate entries from flickering in.
+  const isProgrammaticScrollRef = useRef(false)
+  const programmaticScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Guard: skip active-entry detection in the same tick as a teleport,
   // which prevents briefly highlighting the wrong entry at loop boundaries.
   const isTeleportingRef = useRef(false)
@@ -160,6 +173,7 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
       }
 
       if (isTeleportingRef.current) return
+      if (isProgrammaticScrollRef.current) return
 
       // ── Active entry detection (middle-set refs only) ──
       const cRect = container.getBoundingClientRect()

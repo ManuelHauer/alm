@@ -245,7 +245,7 @@ export default function DesktopScrollLayout({ entries, showBack = false }: Props
         setDragOffset(0)
         return
       }
-      const threshold = (imageColRef.current?.clientWidth ?? 800) * 0.15
+      const threshold = (imageColRef.current?.clientWidth ?? 800) * 0.05
       const offset = dragOffsetRef.current
       if (offset > threshold) commitSwipe(-1)
       else if (offset < -threshold) commitSwipe(1)

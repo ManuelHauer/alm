@@ -53,6 +53,8 @@ export async function getAllEntries(): Promise<EntryDetail[]> {
     depth: 1,
     sort: '-sortOrder',
     limit: 1000,
+    draft: false,
+    where: { _status: { equals: 'published' } },
   })
 
   return docs.map((entry) => ({

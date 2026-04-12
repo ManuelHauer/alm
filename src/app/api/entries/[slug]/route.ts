@@ -24,7 +24,8 @@ export async function GET(
   const { docs } = await payload.find({
     collection: 'entries',
     depth: 1,
-    where: { slug: { equals: slug } },
+    draft: false, // only return published versions, never drafts
+    where: { slug: { equals: slug }, _status: { equals: 'published' } },
     limit: 1,
   })
 

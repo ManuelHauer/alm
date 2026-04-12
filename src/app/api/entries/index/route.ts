@@ -26,6 +26,8 @@ export async function GET() {
     depth: 1, // populate images[].image so we can extract the thumbnail URL
     sort: '-sortOrder',
     limit: 1000, // ~130 entries in production; 1000 is a safe ceiling
+    draft: false, // only return published versions, never drafts
+    where: { _status: { equals: 'published' } },
   })
 
   const index: EntryIndexItem[] = docs.map((entry) => {

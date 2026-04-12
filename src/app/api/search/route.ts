@@ -56,11 +56,11 @@ export async function GET(req: Request) {
     }
   }
 
-  const where: Where = conditions.length > 0
-    ? conditions.length === 1
-      ? conditions[0]
-      : { and: conditions }
-    : {}
+  const statusCondition = { _status: { equals: 'published' } }
+  const where: Where =
+    conditions.length === 0
+      ? statusCondition
+      : { and: [statusCondition, ...conditions] }
 
   const { docs } = await payload.find({
     collection: 'entries',
@@ -68,6 +68,7 @@ export async function GET(req: Request) {
     depth: 1,
     sort: '-sortOrder',
     limit: 1000,
+    draft: false, // only return published versions, never drafts
   })
 
   const results: EntryIndexItem[] = docs.map((entry) => {
