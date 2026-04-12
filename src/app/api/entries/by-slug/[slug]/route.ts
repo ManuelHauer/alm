@@ -1,8 +1,9 @@
 /**
- * GET /api/entries/[slug]
+ * GET /api/entries/by-slug/[slug]
  *
- * Returns the full entry for a given slug.
- * Used by EntryNavigator to fetch entry data on demand as the user navigates.
+ * Returns the full EntryDetail for a given slug.
+ * Moved from api/entries/[slug] to avoid shadowing Payload's own REST
+ * API at /api/entries/:id (numeric IDs), which caused 405 on PATCH.
  *
  * Response: EntryDetail  |  404 { error: 'Not found' }
  */
@@ -24,7 +25,7 @@ export async function GET(
   const { docs } = await payload.find({
     collection: 'entries',
     depth: 1,
-    draft: false, // only return published versions, never drafts
+    draft: false,
     where: { slug: { equals: slug }, _status: { equals: 'published' } },
     limit: 1,
   })
