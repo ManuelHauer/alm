@@ -34,6 +34,7 @@ type Props = {
   onPrevEntry: () => void
   onNextEntry: () => void
   onSwitchToTxt: () => void
+  showBack?: boolean
 }
 
 function wrapIdx(i: number, len: number) {
@@ -42,15 +43,16 @@ function wrapIdx(i: number, len: number) {
 
 const AXIS_LOCK_PX = 10
 const SWIPE_COMMIT_PX = 50
-// CSS transition is 220ms; reset fires at 250ms to guarantee transition
+// CSS transition is 300ms; reset fires at 330ms to guarantee transition
 // finishes before the slot index/offset resets (fixes the snap-white-flash).
-const CAROUSEL_RESET_DELAY = 250
+const CAROUSEL_RESET_DELAY = 330
 
 export default function MobileEntryView({
   entry,
   onPrevEntry,
   onNextEntry,
   onSwitchToTxt,
+  showBack = false,
 }: Props) {
   const hasImages = entry.images.length > 0
   const hasMultipleImages = entry.images.length > 1
@@ -211,6 +213,13 @@ export default function MobileEntryView({
         onClick={onNextEntry}
         aria-label="Next entry"
       />
+
+      {/* Back-to-search — shown only when arriving from /search */}
+      {showBack && (
+        <a href="/search" className={styles.backBtn}>
+          ← Search
+        </a>
+      )}
     </div>
   )
 }

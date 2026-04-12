@@ -28,14 +28,17 @@ import styles from './DesktopScrollLayout.module.css'
 
 type Props = {
   entries: EntryDetail[]
+  showBack?: boolean
 }
 
 const wrapIdx = (i: number, len: number): number => ((i % len) + len) % len
 
-const CAROUSEL_ANIM_MS = 220
-const CAROUSEL_RESET_DELAY = 250
+const CAROUSEL_ANIM_MS = 300
+const CAROUSEL_RESET_DELAY = 330
+// iOS-style easing: gentle acceleration in, fast mid, gentle deceleration out
+const CAROUSEL_EASING = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
 
-export default function DesktopScrollLayout({ entries }: Props) {
+export default function DesktopScrollLayout({ entries, showBack = false }: Props) {
   const [focusedId, setFocusedId] = useState<number>(entries[0]?.id ?? 0)
   const [imageIndex, setImageIndex] = useState(0)
   const [dragOffset, setDragOffset] = useState(0)
@@ -168,6 +171,8 @@ export default function DesktopScrollLayout({ entries }: Props) {
   const dragAxis = useRef<'h' | 'v' | null>(null)
   const isDraggingImg = useRef(false)
   const dragOffsetRef = useRef(0)
+  // RAF handle — throttles state updates to once per frame during drag
+  const dragRafRef = useRef<number | null>(null)
 
   const handleImgPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return
@@ -191,7 +196,14 @@ export default function DesktopScrollLayout({ entries }: Props) {
       }
       if (dragAxis.current === 'h' && numImages > 1) {
         dragOffsetRef.current = dx
-        setDragOffset(dx)
+        // Throttle React state updates to one per animation frame to avoid
+        // triggering a re-render on every pointer event (can be 120+/s).
+        if (dragRafRef.current === null) {
+          dragRafRef.current = requestAnimationFrame(() => {
+            setDragOffset(dragOffsetRef.current)
+            dragRafRef.current = null
+          })
+        }
       }
     },
     [isTransitioning, numImages],
@@ -201,6 +213,11 @@ export default function DesktopScrollLayout({ entries }: Props) {
     (e: React.PointerEvent) => {
       if (!isDraggingImg.current) return
       isDraggingImg.current = false
+      // Cancel any pending RAF so the final state is set synchronously below
+      if (dragRafRef.current !== null) {
+        cancelAnimationFrame(dragRafRef.current)
+        dragRafRef.current = null
+      }
       if (dragAxis.current !== 'h' || numImages <= 1) {
         setDragOffset(0)
         return
@@ -264,7 +281,7 @@ export default function DesktopScrollLayout({ entries }: Props) {
     isDividerDragging.current = false
   }, [])
 
-  const slotTransition = isTransitioning ? `transform ${CAROUSEL_ANIM_MS}ms ease-out` : 'none'
+  const slotTransition = isTransitioning ? `transform ${CAROUSEL_ANIM_MS}ms ${CAROUSEL_EASING}` : 'none'
   const entryNumberStr = String(focusedEntry?.entryNumber ?? 0).padStart(3, '0')
 
   return (
@@ -282,11 +299,28 @@ export default function DesktopScrollLayout({ entries }: Props) {
         onPointerUp={handleImgPointerUp}
         onPointerCancel={handleImgPointerUp}
       >
-        {/* Search icon — top-right corner */}
-        <a href="/search" className={styles.searchBtn} aria-label="Search">
+        {/* Search icon — top-right corner. stopPropagation prevents the imageCol's
+            setPointerCapture from stealing the click before the link fires. */}
+        <a
+          href="/search"
+          className={styles.searchBtn}
+          aria-label="Search"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/search.svg" alt="" className={styles.searchIcon} aria-hidden="true" />
         </a>
+
+        {/* Back-to-search button — shown only when arriving from /search */}
+        {showBack && (
+          <a
+            href="/search"
+            className={styles.backBtn}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            ← Search
+          </a>
+        )}
 
         {/* Centered image stack — number above, carousel, title below */}
         <div className={styles.imageOuter}>

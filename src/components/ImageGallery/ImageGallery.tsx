@@ -46,7 +46,7 @@ export default function ImageGallery({
           className={styles.slot}
           style={{
             transform: `translateX(calc(${offset * 100}% + ${dragOffset}px))`,
-            transition: isTransitioning ? 'transform 220ms ease-out' : 'none', // reset fires at 250ms — see MobileEntryView
+            transition: isTransitioning ? 'transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
           }}
         >
           {item.image && (

@@ -52,7 +52,7 @@ export async function GET(req: Request) {
     })
     const folioIds = folios.map((f) => f.id)
     if (folioIds.length > 0) {
-      conditions.push({ 'folios.value': { in: folioIds } })
+      conditions.push({ folios: { in: folioIds } })
     }
   }
 

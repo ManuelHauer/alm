@@ -1,6 +1,7 @@
 /* Root: flex column — tap zones fill the top and bottom halves,
    image block sits in the middle. */
 .root {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -99,6 +100,30 @@
 
 .dotActive {
   background: var(--alm-orange, #e85c23);
+}
+
+/* ── Back-to-search button ──────────────────────────────────────── */
+
+.backBtn {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 20;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #888;
+  text-decoration: none;
+  padding: 6px 10px;
+  background: rgba(250, 250, 248, 0.85);
+  border: 0.5px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  transition: color 150ms ease;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.backBtn:hover {
+  color: var(--alm-orange, #e85c23);
 }
 
 /* ── Text-only stage (entries with no images) ───────────────────── */

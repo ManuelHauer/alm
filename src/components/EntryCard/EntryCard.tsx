@@ -12,7 +12,7 @@ export default function EntryCard({ entry }: Props) {
   const numberStr = String(entry.entryNumber).padStart(3, '0')
 
   return (
-    <Link href={`/entry/${entry.slug}`} className={styles.card}>
+    <Link href={`/entry/${entry.slug}?from=search`} className={styles.card}>
       <div className={styles.thumb}>
         {entry.firstImageThumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

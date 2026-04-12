@@ -1,7 +1,10 @@
 .root {
-  position: relative;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
   flex: 0 0 69px;
   width: 69px;
+  height: 100dvh;
   background: #fafaf8;
   display: flex;
   flex-direction: column;

@@ -27,13 +27,14 @@ import styles from './EntryNavigator.module.css'
 type Props = {
   entries: EntryDetail[]
   initialSlug?: string
+  showBack?: boolean
 }
 
 function wrapIdx(i: number, len: number) {
   return ((i % len) + len) % len
 }
 
-export default function EntryNavigator({ entries, initialSlug }: Props) {
+export default function EntryNavigator({ entries, initialSlug, showBack = false }: Props) {
   const [isMobile, setIsMobile] = useState(false)
   const [imgTxtView, setImgTxtView] = useState<'img' | 'txt'>('img')
 
@@ -92,6 +93,7 @@ export default function EntryNavigator({ entries, initialSlug }: Props) {
               onPrevEntry={goPrevEntry}
               onNextEntry={goNextEntry}
               onSwitchToTxt={() => setImgTxtView('txt')}
+              showBack={showBack}
             />
           ) : (
             <MobileTxtView
@@ -130,5 +132,5 @@ export default function EntryNavigator({ entries, initialSlug }: Props) {
   }
 
   // ── Desktop layout — DesktopScrollLayout is self-contained ─────────
-  return <DesktopScrollLayout entries={entries} />
+  return <DesktopScrollLayout entries={entries} showBack={showBack} />
 }

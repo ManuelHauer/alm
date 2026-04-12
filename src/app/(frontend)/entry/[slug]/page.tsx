@@ -5,6 +5,7 @@ import { getAllEntries } from '@/lib/getEntries'
 
 type Props = {
   params: Promise<{ slug: string }>
+  searchParams: Promise<{ from?: string }>
 }
 
 export async function generateMetadata({ params }: Props) {
@@ -25,10 +26,10 @@ export async function generateMetadata({ params }: Props) {
  * crawlable and shareable. After hydration, EntryNavigator takes over
  * and the user can navigate the full archive from this entry.
  */
-export default async function EntryPage({ params }: Props) {
-  const { slug } = await params
+export default async function EntryPage({ params, searchParams }: Props) {
+  const [{ slug }, { from }] = await Promise.all([params, searchParams])
   const entries = await getAllEntries()
   if (!entries.find((e) => e.slug === slug)) notFound()
 
-  return <EntryNavigator entries={entries} initialSlug={slug} />
+  return <EntryNavigator entries={entries} initialSlug={slug} showBack={from === 'search'} />
 }
