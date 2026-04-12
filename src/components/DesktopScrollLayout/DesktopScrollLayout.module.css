@@ -1,217 +1,205 @@
 /*
- * DesktopScrollLayout — M2 prototype styles.
+ * DesktopScrollLayout — 3-column desktop layout.
  *
- * Layout invariants:
- *   - Left panel 60%, position: sticky top:0, height: 100vh
- *   - Right panel 40%, continuous scroll container
- *   - Entry blocks: natural height, no fixed 100vh constraint
- *   - In-focus entry: number orange #E8531E, full opacity
- *   - Out-of-focus entries: opacity 0.4, transition 200ms
- *   - Left panel: 3-slot image carousel (prev / cur / next)
- *     translated by dragOffset; overflow clipped by .left
- *   - Text-only entries: .leftEmpty shown, slots not rendered
+ * Structure (left → right):
+ *   NavRail (--rail-width ≈ 69px, handled by MobileNavRail)
+ *   imageCol  (resizable, default ~66% of remaining space)
+ *   divider   (1px)
+ *   textCol   (flex: 1, MobileTxtView owns its own scroll)
+ *
+ * The root is 100dvh, overflow hidden. No page scroll.
+ * The text column scrolls internally via MobileTxtView.
  */
+
+/* ── Root ───────────────────────────────────────────────────────── */
 
 .root {
   display: flex;
+  flex-direction: row;
+  height: 100dvh;
   width: 100%;
-  min-height: 100vh;
+  overflow: hidden;
   background: #fafaf8;
   color: #111;
-  font-family: system-ui, -apple-system, sans-serif;
 }
 
-/* ─── Left panel (sticky 60%) ──────────────────────────────────── */
+/* ── Image column ───────────────────────────────────────────────── */
 
-.left {
-  flex: 0 0 60%;
-  height: 100vh;
-  position: sticky;
-  top: 0;
-  background: #efefea;
-  overflow: hidden;
-  /* Clips the prev/next carousel slots */
+.imageCol {
+  position: relative;
+  height: 100dvh;
+  background: #fafaf8;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   user-select: none;
+  touch-action: none;
 }
 
-.leftDraggable {
+.imageColDraggable {
   cursor: grab;
 }
 
-.leftDraggable:active {
+.imageColDraggable:active {
   cursor: grabbing;
 }
 
-.leftImageStack {
-  position: relative;
-  width: 100%;
-  height: 100%;
+/* Search icon — absolute top-right of image column */
+.searchBtn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 10;
+  width: 88px;
+  height: 88px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 14px 14px 0 0;
+  /* Corner gradient: solid at top-right, fades down and left */
+  background: linear-gradient(
+    to bottom left,
+    rgba(250, 250, 248, 0.95) 0%,
+    rgba(250, 250, 248, 0.55) 45%,
+    transparent 100%
+  );
+  text-decoration: none;
 }
 
-/* ─── 3-slot carousel ───────────────────────────────────────────── */
+.searchIcon {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
 
-/* Each slot is absolutely positioned and fills the container.
-   The JS sets translateX: calc(-100% + offset), offset, calc(100% + offset)
-   for prev, cur, next. The parent .left clips the overflow. */
-.imageSlot {
+/* imageOuter fills the column and centers imageStack */
+.imageOuter {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Empty state (no images) */
+.imageEmpty {
+  width: 100%;
+  height: 60%;
+  background: #efefea;
+}
+
+/* imageStack: shares the computed image width so entryNumber and imageTitle
+   align with the image edges. Flex-column stacks: number → image → title. */
+.imageStack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+/* ── Image overlays ─────────────────────────────────────────────── */
+
+/* Entry number — above the image, left-aligned */
+.entryNumber {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: #999;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* imageInner receives explicit height from JS; width fills imageStack */
+.imageInner {
+  position: relative;
+  width: 100%;
+}
+
+/* Carousel clip — clips prev/next off-screen slots */
+.carouselClip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Each of the 3 carousel slots (prev / cur / next) */
+.carouselSlot {
   position: absolute;
   inset: 0;
   will-change: transform;
 }
 
-.slotImage {
+.slotImg {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
+  display: block;
 }
 
-/* ─── Text-only empty state ─────────────────────────────────────── */
-
-.leftEmpty {
-  position: absolute;
-  inset: 0;
-  background: #e6e6df;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #999;
-  font-size: 13px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-/* ─── Carousel prev/next click areas ───────────────────────────── */
-
-/* Each button is a full-height strip on the left/right of the panel.
-   Hidden by default; the chevron fades in on hover. A subtle gradient
-   gives the click area a physical edge without being decorative. */
-.carouselPrev,
-.carouselNext {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 40%;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  background: transparent;
-  border: none;
-  padding: 0 20px;
-  cursor: pointer;
-  color: transparent;
-  transition: color 150ms ease, background 150ms ease;
-}
-
-.carouselPrev {
-  left: 0;
-  justify-content: flex-start;
-}
-
-.carouselNext {
-  right: 0;
-  justify-content: flex-end;
-}
-
-.carouselPrev:hover {
-  color: rgba(255, 255, 255, 0.9);
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.18), transparent);
-}
-
-.carouselNext:hover {
-  color: rgba(255, 255, 255, 0.9);
-  background: linear-gradient(to left, rgba(0, 0, 0, 0.18), transparent);
-}
-
-/* ─── Carousel dots ─────────────────────────────────────────────── */
-
+/* Dots — bottom center of imageInner */
 .dots {
   position: absolute;
-  bottom: 24px;
+  bottom: 8px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 8px;
+  gap: 6px;
   z-index: 2;
+  pointer-events: auto;
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.4);
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.18);
+  border: none;
   cursor: pointer;
   padding: 0;
-  transition: background 200ms ease;
+  transition: background 150ms ease;
+  flex-shrink: 0;
 }
 
 .dotActive {
-  background: #ffffff;
+  background: var(--alm-orange, #e85c23);
 }
 
-/* ─── Right panel (40% scroll container) ───────────────────────── */
-
-.right {
-  flex: 0 0 40%;
-  height: 100vh;
-  overflow-y: auto;
-  /* Bottom padding lets the last entry scroll up past the 30% focus line */
-  padding-bottom: 70vh;
+/* Title — below the image, left-aligned */
+.imageTitle {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #888;
+  line-height: 1.3;
+  text-transform: uppercase;
 }
 
-.entry {
+/* ── Drag divider ───────────────────────────────────────────────── */
+
+.divider {
+  flex: 0 0 1px;
+  height: 100dvh;
+  cursor: col-resize;
+  background: rgba(0, 0, 0, 0.12);
+  transition: background 150ms ease;
+  z-index: 5;
+  touch-action: none;
+}
+
+.divider:hover,
+.divider:active {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* ── Text column ────────────────────────────────────────────────── */
+
+.textCol {
+  flex: 1;
+  min-width: 0;
+  height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 64px 48px;
-  box-sizing: border-box;
-  opacity: 0.4;
-  transition: opacity 200ms ease;
-  cursor: default;
-}
-
-.entryFocused {
-  opacity: 1;
-}
-
-.entryNumber {
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  color: #999;
-  margin-bottom: 24px;
-  font-variant-numeric: tabular-nums;
-  transition: color 200ms ease;
-}
-
-.entryFocused .entryNumber {
-  color: #e8531e; /* alm orange */
-}
-
-.entryHeader {
-  margin-bottom: 16px;
-}
-
-.entryTitle {
-  font-size: 28px;
-  line-height: 1.2;
-  margin: 0 0 8px 0;
-  font-weight: 500;
-}
-
-.entryMeta {
-  font-size: 14px;
-  color: #666;
-  margin: 0;
-}
-
-.entryDescription {
-  font-size: 15px;
-  line-height: 1.6;
-  color: #333;
-  margin-top: 16px;
 }

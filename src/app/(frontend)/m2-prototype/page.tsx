@@ -16,5 +16,5 @@ export const metadata = {
 }
 
 export default function M2PrototypePage() {
-  return <DesktopScrollLayout />
+  return <DesktopScrollLayout entries={[]} />
 }

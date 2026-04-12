@@ -1,203 +1,216 @@
 'use client'
 
 /**
- * MobileEntryView — full-screen mobile entry display.
+ * MobileEntryView — IMG mode for a single entry.
  *
- * Layout:
- *   - Image area (top ~62%) with 3-slot carousel
- *   - Info area (scrollable, bottom ~38%): title, meta, description
+ * Layout (flex column filling available height):
  *
- * Gestures (single useDrag on the image area with manual axis lock):
- *   - Horizontal drag → image carousel swipe
- *   - Vertical drag → entry navigation (prev entry = swipe down, next = swipe up)
+ *   ┌─────────────────────────────┐
+ *   │    top tap zone (flex:1)    │ ← tap → prev entry
+ *   ├─────────────────────────────┤
+ *   │ 01                          │ ← entry number (orange, top-left)
+ *   │  ┌──────────────────────┐   │
+ *   │  │      image           │   │ ← intrinsic aspect-ratio height
+ *   │  └──────────────────────┘   │
+ *   │ Title           · ·  ●      │ ← title (left) + dots (right, orange active)
+ *   ├─────────────────────────────┤
+ *   │   bottom tap zone (flex:1)  │ ← tap → next entry
+ *   └─────────────────────────────┘
  *
- * Entry navigation also works via tap zones:
- *   - Tap top 40% of image area → prev entry
- *   - Tap bottom 40% of image area → next entry
- *   (Centre 20% reserved for gesture, no accidental tap conflict)
+ * Image block taps → switch to TXT mode.
+ * Gestures: horizontal = carousel, vertical = entry navigation.
  */
 
 import { useDrag } from '@use-gesture/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { EntryDetail } from '@/types/entry'
 import ImageGallery from '@/components/ImageGallery/ImageGallery'
+import type { EntryDetail } from '@/types/entry'
 
 import styles from './MobileEntryView.module.css'
 
 type Props = {
   entry: EntryDetail
-  entries: EntryDetail[]
-  currentIndex: number
-  imgTxtView: 'img' | 'txt'
-  onNavigate: (index: number) => void
+  onPrevEntry: () => void
+  onNextEntry: () => void
+  onSwitchToTxt: () => void
 }
 
 function wrapIdx(i: number, len: number) {
   return ((i % len) + len) % len
 }
 
-const SWIPE_THRESHOLD = 50 // px to commit a swipe
+const AXIS_LOCK_PX = 10
+const SWIPE_COMMIT_PX = 50
+// CSS transition is 220ms; reset fires at 250ms to guarantee transition
+// finishes before the slot index/offset resets (fixes the snap-white-flash).
+const CAROUSEL_RESET_DELAY = 250
 
 export default function MobileEntryView({
   entry,
-  entries,
-  currentIndex,
-  imgTxtView,
-  onNavigate,
+  onPrevEntry,
+  onNextEntry,
+  onSwitchToTxt,
 }: Props) {
-  // ── Image carousel state ─────────────────────────────────────────
+  const hasImages = entry.images.length > 0
+  const hasMultipleImages = entry.images.length > 1
+
+  // ── Carousel state ───────────────────────────────────────────────
   const [imageIndex, setImageIndex] = useState(0)
   const [imageDragOffset, setImageDragOffset] = useState(0)
-  const [isImageTransitioning, setIsImageTransitioning] = useState(false)
-  const imageDragOffsetRef = useRef(0)
-  const isImageTransitioningRef = useRef(false)
+  const [isCarouselAnimating, setIsCarouselAnimating] = useState(false)
+  const isCarouselAnimatingRef = useRef(false)
 
-  // ── Entry swipe state ────────────────────────────────────────────
-  const [entryDragOffset, setEntryDragOffset] = useState(0)
-  const [isEntryTransitioning, setIsEntryTransitioning] = useState(false)
-
-  // ── Axis lock ────────────────────────────────────────────────────
+  // ── Gesture axis lock ────────────────────────────────────────────
   const lockedAxis = useRef<'h' | 'v' | null>(null)
+  const verticalCommittedRef = useRef(false)
 
-  // Reset image index when entry changes
   useEffect(() => {
     setImageIndex(0)
     setImageDragOffset(0)
-    imageDragOffsetRef.current = 0
   }, [entry.id])
 
   const commitImageSwipe = useCallback(
     (direction: 1 | -1) => {
-      if (isImageTransitioningRef.current) return
-      const len = entry.images.length
-      if (len <= 1) return
-
-      const panelWidth = window.innerWidth
-      isImageTransitioningRef.current = true
-      setIsImageTransitioning(true)
-      // Fly current slot off-screen in swipe direction
-      imageDragOffsetRef.current = direction * -panelWidth
+      if (isCarouselAnimatingRef.current || !hasMultipleImages) return
+      // Measure content width, not full window, to account for the nav rail
+      const panelWidth = document.documentElement.clientWidth
+      isCarouselAnimatingRef.current = true
+      setIsCarouselAnimating(true)
       setImageDragOffset(direction * -panelWidth)
 
       setTimeout(() => {
-        setImageIndex((prev) => wrapIdx(prev + direction, len))
-        // Reset offset without transition so slots snap back
-        isImageTransitioningRef.current = false
-        setIsImageTransitioning(false)
-        imageDragOffsetRef.current = 0
+        setImageIndex((prev) => wrapIdx(prev + direction, entry.images.length))
+        isCarouselAnimatingRef.current = false
+        setIsCarouselAnimating(false)
         setImageDragOffset(0)
-      }, 220)
+      }, CAROUSEL_RESET_DELAY)
     },
-    [entry.images.length],
+    [entry.images.length, hasMultipleImages],
   )
 
-  const navigateEntry = useCallback(
-    (direction: 1 | -1) => {
-      const next = wrapIdx(currentIndex + direction, entries.length)
-      onNavigate(next)
-    },
-    [currentIndex, entries.length, onNavigate],
-  )
+  const snapBackCarousel = useCallback(() => {
+    isCarouselAnimatingRef.current = true
+    setIsCarouselAnimating(true)
+    setImageDragOffset(0)
+    setTimeout(() => {
+      isCarouselAnimatingRef.current = false
+      setIsCarouselAnimating(false)
+    }, CAROUSEL_RESET_DELAY)
+  }, [])
 
-  // ── Single drag handler on image area ───────────────────────────
+  // ── Drag handler (axis-locked, no velocity) ──────────────────────
   const bind = useDrag(
-    ({ first, last, movement: [mx, my], velocity: [vx, vy], cancel, event }) => {
+    ({ first, last, movement: [mx, my], cancel }) => {
       if (first) {
         lockedAxis.current = null
+        verticalCommittedRef.current = false
       }
 
-      // Lock axis after 6px of movement
-      if (lockedAxis.current === null && (Math.abs(mx) > 6 || Math.abs(my) > 6)) {
-        lockedAxis.current = Math.abs(mx) >= Math.abs(my) ? 'h' : 'v'
+      if (lockedAxis.current === null) {
+        if (Math.abs(mx) > AXIS_LOCK_PX || Math.abs(my) > AXIS_LOCK_PX) {
+          lockedAxis.current = Math.abs(mx) >= Math.abs(my) ? 'h' : 'v'
+        }
       }
 
       if (lockedAxis.current === 'h') {
-        // Horizontal — image carousel
-        if (isImageTransitioningRef.current) { cancel(); return }
+        if (!hasMultipleImages) {
+          cancel()
+          return
+        }
+        if (isCarouselAnimatingRef.current) {
+          cancel()
+          return
+        }
         if (!last) {
-          imageDragOffsetRef.current = mx
           setImageDragOffset(mx)
         } else {
-          const shouldCommit = Math.abs(mx) > SWIPE_THRESHOLD || Math.abs(vx) > 0.5
-          if (shouldCommit) {
-            commitImageSwipe(mx < 0 ? 1 : -1)
-          } else {
-            // Snap back
-            setIsImageTransitioning(true)
-            isImageTransitioningRef.current = true
-            imageDragOffsetRef.current = 0
-            setImageDragOffset(0)
-            setTimeout(() => {
-              setIsImageTransitioning(false)
-              isImageTransitioningRef.current = false
-            }, 220)
-          }
+          if (Math.abs(mx) > SWIPE_COMMIT_PX) commitImageSwipe(mx < 0 ? 1 : -1)
+          else snapBackCarousel()
         }
       } else if (lockedAxis.current === 'v') {
-        // Vertical — entry navigation
-        if (!last) {
-          setEntryDragOffset(my)
-        } else {
-          const shouldCommit = Math.abs(my) > SWIPE_THRESHOLD || Math.abs(vy) > 0.5
-          if (shouldCommit) {
-            // Negative my = swipe up = next entry
-            navigateEntry(my < 0 ? 1 : -1)
+        if (last && !verticalCommittedRef.current) {
+          if (Math.abs(my) > SWIPE_COMMIT_PX) {
+            verticalCommittedRef.current = true
+            if (my < 0) onNextEntry()
+            else onPrevEntry()
           }
-          setEntryDragOffset(0)
-          setIsEntryTransitioning(false)
         }
       }
     },
-    {
-      filterTaps: true,
-      pointer: { touch: true },
-    },
+    { filterTaps: true, pointer: { touch: true } },
   )
 
-  const hasImages = entry.images.length > 0
-  const showImage = imgTxtView === 'img' && hasImages
+  const entryNumberStr = String(entry.entryNumber).padStart(3, '0')
+
+  // Compute aspect-ratio from the primary image so imageWrap has intrinsic height.
+  const primaryImage = entry.images[0]?.image
+  const aspectRatio =
+    primaryImage && primaryImage.width > 0 && primaryImage.height > 0
+      ? primaryImage.width / primaryImage.height
+      : undefined
 
   return (
-    <div className={styles.root}>
-      {/* ── Image / gallery area ─────────────────────────────── */}
-      <div
-        className={styles.imageArea}
-        style={{
-          transform: `translateY(${entryDragOffset}px)`,
-          transition: isEntryTransitioning ? 'transform 220ms ease-out' : 'none',
-        }}
-        {...bind()}
+    <div className={styles.root} {...bind()}>
+      {/* ── Top tap zone → prev entry ─────────────────────────────── */}
+      <button
+        type="button"
+        className={styles.tapZone}
+        onClick={onPrevEntry}
+        aria-label="Previous entry"
+      />
+
+      {/* ── Image block — tap anywhere inside → switch to TXT ──────── */}
+      <button
+        type="button"
+        className={styles.imageBlock}
+        onClick={onSwitchToTxt}
+        aria-label="Switch to text view"
       >
-        {showImage ? (
-          <ImageGallery
-            images={entry.images}
-            currentIndex={imageIndex}
-            dragOffset={imageDragOffset}
-            isTransitioning={isImageTransitioning}
-            onDotClick={setImageIndex}
-          />
+        <span className={styles.entryNumber}>{entryNumberStr}</span>
+
+        {hasImages ? (
+          <div
+            className={styles.imageWrap}
+            style={aspectRatio ? { aspectRatio: String(aspectRatio) } : undefined}
+          >
+            <ImageGallery
+              images={entry.images}
+              currentIndex={imageIndex}
+              dragOffset={imageDragOffset}
+              isTransitioning={isCarouselAnimating}
+            />
+          </div>
         ) : (
-          <div className={styles.noImage}>
-            <span>{entry.title}</span>
+          <div className={styles.textOnly}>
+            <span className={styles.textOnlyTitle}>{entry.title}</span>
           </div>
         )}
-      </div>
 
-      {/* ── Info area ─────────────────────────────────────────── */}
-      <div className={styles.infoArea}>
-        <div className={styles.infoScroll}>
-          <div className={styles.entryMeta}>
-            <span className={styles.entryNumber}>{String(entry.entryNumber).padStart(3, '0')}</span>
-            {entry.year && <span className={styles.metaItem}>{entry.year}</span>}
-            {entry.place && <span className={styles.metaItem}>{entry.place}</span>}
+        {hasImages && (
+          <div className={styles.imageFooter}>
+            <span className={styles.title}>{entry.title}</span>
+            {hasMultipleImages && (
+              <div className={styles.dots} aria-hidden="true">
+                {entry.images.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`${styles.dot} ${i === imageIndex ? styles.dotActive : ''}`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-          <h1 className={styles.title}>{entry.title}</h1>
-          {entry.plainDescription && (
-            <p className={styles.description}>{entry.plainDescription}</p>
-          )}
-        </div>
-      </div>
+        )}
+      </button>
+
+      {/* ── Bottom tap zone → next entry ──────────────────────────── */}
+      <button
+        type="button"
+        className={styles.tapZone}
+        onClick={onNextEntry}
+        aria-label="Next entry"
+      />
     </div>
   )
 }

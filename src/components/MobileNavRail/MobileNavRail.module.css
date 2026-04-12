@@ -1,0 +1,71 @@
+.root {
+  position: relative;
+  flex: 0 0 69px;
+  width: 69px;
+  background: #fafaf8;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  border-right: var(--separator, 0.5px solid #808080);
+  z-index: 10;
+}
+
+/* ── alm logo (white on grey block, top) ───────────────────────── */
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0;
+  /* White background shows through transparent letter cutouts in the SVG,
+     making the letters appear white against the SVG's grey rectangle fill */
+  background: #fff;
+  text-decoration: none;
+}
+
+.logoImg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.logo:hover {
+  opacity: 0.85;
+}
+
+/* ── Vertical link stack ────────────────────────────────────────── */
+
+/* Mobile: links pushed to bottom */
+.links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 20px;
+}
+
+/* Desktop: links centered vertically in remaining space */
+.rootDesktop .links {
+  flex: 1;
+  justify-content: center;
+  padding-bottom: 0;
+}
+
+.link {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-decoration: none;
+  color: #888;
+  font-weight: 400;
+  padding: 4px 0;
+  white-space: nowrap;
+}
+
+.link:hover {
+  color: #111;
+}

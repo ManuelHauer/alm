@@ -1,92 +1,120 @@
+/* Root: flex column — tap zones fill the top and bottom halves,
+   image block sits in the middle. */
 .root {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0; /* critical: lets flex children respect parent height */
-  overflow: hidden;
   background: #fafaf8;
-}
-
-/* ── Image area ──────────────────────────────────────────────────── */
-
-.imageArea {
-  flex: 0 0 62%;
-  position: relative;
-  overflow: hidden;
   touch-action: none;
-  cursor: grab;
-  will-change: transform;
-}
-
-.imageArea:active {
-  cursor: grabbing;
-}
-
-.noImage {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #e8e8e4;
-  color: #888;
-  font-size: 13px;
-}
-
-/* ── Info area ───────────────────────────────────────────────────── */
-
-.infoArea {
-  flex: 1 1 0;
+  user-select: none;
   overflow: hidden;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.infoScroll {
-  height: 100%;
-  overflow-y: auto;
-  padding: 16px 20px 24px;
-  -webkit-overflow-scrolling: touch;
+/* ── Tap zones (top = prev, bottom = next) ──────────────────────── */
+
+.tapZone {
+  flex: 1;
+  min-height: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: block;
+  width: 100%;
 }
 
-.entryMeta {
+/* ── Image block (entire area is the TXT switch target) ─────────── */
+
+.imageBlock {
+  flex: 0 0 auto;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+  flex-direction: column;
+  padding: 0 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
 }
 
+/* Entry number — orange, above the image, no extra bottom padding */
 .entryNumber {
+  display: block;
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.08em;
-  color: #aaa;
+  letter-spacing: 0.1em;
+  color: var(--alm-orange, #e85c23);
   font-variant-numeric: tabular-nums;
+  padding-bottom: 0;
+  text-align: left;
 }
 
-.metaItem {
-  font-size: 11px;
-  color: #aaa;
-  letter-spacing: 0.02em;
+/* ── Image wrapper: intrinsic height via aspect-ratio ───────────── */
+
+.imageWrap {
+  position: relative;
+  width: 100%;
+  /* aspect-ratio is set inline from image data;
+     max-height prevents very tall portrait images from overflowing */
+  max-height: 62vh;
+  overflow: hidden;
 }
 
-.metaItem::before {
-  content: '·';
-  margin-right: 10px;
+/* ── Footer: title (left) + dots (right) ───────────────────────── */
+
+.imageFooter {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 5px;
 }
 
 .title {
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 1.3;
-  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 400;
   color: #111;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+  flex: 1;
+  text-align: left;
 }
 
-.description {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #444;
-  margin: 0;
-  white-space: pre-wrap;
+.dots {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #d0d0ca;
+  transition: background 150ms;
+}
+
+.dotActive {
+  background: var(--alm-orange, #e85c23);
+}
+
+/* ── Text-only stage (entries with no images) ───────────────────── */
+
+.textOnly {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+}
+
+.textOnlyTitle {
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: center;
+  color: #111;
+  max-width: 85%;
 }
