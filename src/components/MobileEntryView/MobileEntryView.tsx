@@ -60,6 +60,7 @@ export default function MobileEntryView({
   // ── Carousel state ───────────────────────────────────────────────
   const [imageIndex, setImageIndex] = useState(0)
   const [imageDragOffset, setImageDragOffset] = useState(0)
+  const [commitDir, setCommitDir] = useState(0)
   const [isCarouselAnimating, setIsCarouselAnimating] = useState(false)
   const isCarouselAnimatingRef = useRef(false)
 
@@ -70,22 +71,22 @@ export default function MobileEntryView({
   useEffect(() => {
     setImageIndex(0)
     setImageDragOffset(0)
+    setCommitDir(0)
   }, [entry.id])
 
   const commitImageSwipe = useCallback(
     (direction: 1 | -1) => {
       if (isCarouselAnimatingRef.current || !hasMultipleImages) return
-      // Measure content width, not full window, to account for the nav rail
-      const panelWidth = document.documentElement.clientWidth
       isCarouselAnimatingRef.current = true
       setIsCarouselAnimating(true)
-      setImageDragOffset(direction * -panelWidth)
+      setCommitDir(direction) // moves slots ±100% — no pixel overshoot
+      setImageDragOffset(0)   // animate drag portion back to 0
 
       setTimeout(() => {
         setImageIndex((prev) => wrapIdx(prev + direction, entry.images.length))
         isCarouselAnimatingRef.current = false
         setIsCarouselAnimating(false)
-        setImageDragOffset(0)
+        setCommitDir(0) // reset without animation (transition: none)
       }, CAROUSEL_RESET_DELAY)
     },
     [entry.images.length, hasMultipleImages],
@@ -94,7 +95,7 @@ export default function MobileEntryView({
   const snapBackCarousel = useCallback(() => {
     isCarouselAnimatingRef.current = true
     setIsCarouselAnimating(true)
-    setImageDragOffset(0)
+    setImageDragOffset(0) // animate drag offset back to 0
     setTimeout(() => {
       isCarouselAnimatingRef.current = false
       setIsCarouselAnimating(false)
@@ -180,6 +181,7 @@ export default function MobileEntryView({
               images={entry.images}
               currentIndex={imageIndex}
               dragOffset={imageDragOffset}
+              commitDir={commitDir}
               isTransitioning={isCarouselAnimating}
             />
           </div>

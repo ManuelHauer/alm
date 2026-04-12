@@ -2,7 +2,8 @@
  * Seed script for M1 verification.
  *
  * Creates: 1 admin user, 2 folios, 5 entries (2 multi-image, 1 single-image,
- * 1 text-only, 1 with animated GIF), 5 studio pages.
+ * 1 text-only, 1 with animated GIF), 4 studio pages (andrea, practice,
+ * point-of-departure, contact).
  *
  * Idempotent: wipes entries/folios/media/studio-pages on each run, then
  * recreates from scratch. Safe to re-run during development.
@@ -17,6 +18,28 @@ import config from '../src/payload/payload.config'
 
 // ─── helpers ────────────────────────────────────────────────────────────
 
+/** Wraps one string into a single Lexical paragraph node. */
+const lexParagraph = (text: string) => ({
+  type: 'paragraph',
+  format: '' as const,
+  indent: 0,
+  version: 1,
+  direction: 'ltr' as const,
+  textFormat: 0,
+  textStyle: '',
+  children: [
+    {
+      type: 'text',
+      format: 0,
+      mode: 'normal',
+      style: '',
+      text,
+      detail: 0,
+      version: 1,
+    },
+  ],
+})
+
 /** Wraps a plain string in the minimal Lexical paragraph shape. */
 const lex = (text: string) => ({
   root: {
@@ -25,28 +48,19 @@ const lex = (text: string) => ({
     indent: 0,
     version: 1,
     direction: 'ltr' as const,
-    children: [
-      {
-        type: 'paragraph',
-        format: '' as const,
-        indent: 0,
-        version: 1,
-        direction: 'ltr' as const,
-        textFormat: 0,
-        textStyle: '',
-        children: [
-          {
-            type: 'text',
-            format: 0,
-            mode: 'normal',
-            style: '',
-            text,
-            detail: 0,
-            version: 1,
-          },
-        ],
-      },
-    ],
+    children: [lexParagraph(text)],
+  },
+})
+
+/** Wraps multiple strings into a Lexical document — one paragraph per string. */
+const lexMulti = (...paragraphs: string[]) => ({
+  root: {
+    type: 'root',
+    format: '' as const,
+    indent: 0,
+    version: 1,
+    direction: 'ltr' as const,
+    children: paragraphs.map(lexParagraph),
   },
 })
 
@@ -326,38 +340,47 @@ async function seed() {
       pageSlug: 'andrea',
       title: 'Andrea Lenardin Madden',
       sortOrder: 1,
-      content: lex(
-        'Andrea Lenardin Madden is a multidisciplinary designer working across architecture, interiors, identity, and packaging. Placeholder bio — replace via admin.',
+      content: lexMulti(
+        'Lenardin\'s approach to architecture and design has been shaped by growing up and studying in Vienna, where the visual and performing arts are part of everyday discourse. A sensitivity to the layers of time and meaning that accrue to places is a hallmark of her work, joined to an equal commitment to innovation.',
+        'Her education in architecture is complemented by professional studies in graphic design, product design, and fashion design. Inspired by the Renaissance architect\'s polyvalence and ability to engage every dimension of a project, Lenardin is driven by the question: can I do more, only to arrive at less?',
+        'By eliciting something particular from the generic and infusing the mundane with effortless artfulness, Lenardin\'s open-ended approach enables her to devise distinctive design solutions and execute them with rigor and ingenuity.',
+        'Andrea Lenardin Madden AIA',
+        'Mag Arch, University of Applied Arts, Vienna | M.Arch, SCI-Arc, Los Angeles',
+        'Schindler Fellow | Fulbright Scholar',
       ),
     },
     {
       pageSlug: 'practice',
       title: 'Practice',
       sortOrder: 2,
-      content: lex(
-        'alm project is a studio working at the intersection of architecture and graphic design. Placeholder text — replace via admin.',
+      content: lexMulti(
+        'a l m project is a multidisciplinary design studio led by Andrea Lenardin Madden. The work of the studio is comprehensive in scope, touching every aspect of a project—architecture, interiors, and landscape; brand experience development, identity design, graphics and packaging; display and environmental signage systems, retail design, and digital interfaces.',
+        'Each new project sets a l m on a journey. Energized as much by curiosity as by a desire to balance the elemental with the innovative, the studio begins by defining the distinctive mood that will inform a space, a building, an object, and ultimately shape its character and meaning. A collaborative process and a shared commitment to excellence ensure a final result of substance and integrity. Based in Los Angeles and Vienna, the studio works fluently across cultures and time zones.',
       ),
     },
     {
       pageSlug: 'point-of-departure',
       title: 'Point of Departure',
       sortOrder: 3,
-      content: lex(
-        'Every project begins as a point of departure — a question, an observation, a constraint. Placeholder essay — replace via admin.',
+      content: lexMulti(
+        'Over the years, Andrea Lenardin Madden has built a practice at the intersection of architecture and art, with an eye toward the broader domain of placemaking. The studio\'s projects are keyed to a specific place and time, and are guided by two experiential approaches that have come to frame its thinking: instant days and future memories.',
+        'Lenardin coined the term "instant days" to describe an early theoretical project that gave form to a vision of architectural practice as a holistic consideration of space and the objects it contains—one in which every aspect is imbued with both visceral and visual content that nourishes inhabitants and users.',
+        'Guided by this underlying methodology, the process moves through deep analysis, strategic exploration of program, and the distillation of intrinsic elements and qualities. The result is an open-ended system in which change is embraced as an opportunity to set the stage for future memories.',
       ),
-    },
-    {
-      pageSlug: 'books',
-      title: 'Books',
-      sortOrder: 4,
-      content: lex('Books — content to be added.'),
     },
     {
       pageSlug: 'contact',
       title: 'Contact',
-      sortOrder: 5,
-      content: lex(
-        'Los Angeles · Vienna · hello@almproject.com · Placeholder contact info — replace via admin.',
+      sortOrder: 4,
+      content: lexMulti(
+        'a l m project inc',
+        '5544 Hollywood Boulevard, Los Angeles CA 90028',
+        'Los Angeles +1 323 570 0571',
+        'studio@almproject.com',
+        'Vienna +43 1 581 1896',
+        'atelier@almproject.com',
+        'a l m Los Angeles is currently accepting internship applications.',
+        'studio@almproject.com',
       ),
     },
   ]

@@ -42,6 +42,9 @@ export default function DesktopScrollLayout({ entries, showBack = false }: Props
   const [focusedId, setFocusedId] = useState<number>(entries[0]?.id ?? 0)
   const [imageIndex, setImageIndex] = useState(0)
   const [dragOffset, setDragOffset] = useState(0)
+  // commitDir drives the commit animation using CSS % (not pixels) so slots
+  // always land exactly at slot boundaries — no overshoot regardless of drag.
+  const [commitDir, setCommitDir] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const isTransitioningRef = useRef(false)
 
@@ -76,6 +79,7 @@ export default function DesktopScrollLayout({ entries, showBack = false }: Props
   useEffect(() => {
     setImageIndex(0)
     setDragOffset(0)
+    setCommitDir(0)
     setIsTransitioning(false)
   }, [focusedId])
 
@@ -118,18 +122,20 @@ export default function DesktopScrollLayout({ entries, showBack = false }: Props
   }, [imgContainerSize, focusedImages, curIdx])
 
   // ── Carousel commit ──────────────────────────────────────────────
+  // Uses CSS % (via commitDir) instead of pixels so the slot always lands
+  // at exactly ±100% regardless of drag offset — eliminates overshoot/bounce.
   const commitSwipe = useCallback(
     (direction: 1 | -1) => {
       if (numImages <= 1 || isTransitioningRef.current) return
-      const panelW = imageColRef.current?.clientWidth ?? 800
       isTransitioningRef.current = true
       setIsTransitioning(true)
-      setDragOffset(direction * -panelW)
+      setCommitDir(direction) // animates slots by ±100%
+      setDragOffset(0)        // animate drag portion back to 0
       setTimeout(() => {
         setImageIndex((prev) => wrapIdx(prev + direction, numImages))
         isTransitioningRef.current = false
         setIsTransitioning(false)
-        setDragOffset(0)
+        setCommitDir(0) // reset without animation (transition: none)
       }, CAROUSEL_RESET_DELAY)
     },
     [numImages],
@@ -352,7 +358,7 @@ export default function DesktopScrollLayout({ entries, showBack = false }: Props
                       key={slot}
                       className={styles.carouselSlot}
                       style={{
-                        transform: `translateX(calc(${slot * 100}% + ${dragOffset}px))`,
+                        transform: `translateX(calc(${slot * 100}% + ${dragOffset}px + ${commitDir * -100}%))`,
                         transition: slotTransition,
                       }}
                     >

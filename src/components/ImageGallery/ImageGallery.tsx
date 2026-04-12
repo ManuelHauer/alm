@@ -17,6 +17,7 @@ type Props = {
   images: EntryImageItem[]
   currentIndex: number
   dragOffset: number
+  commitDir?: number // -1 | 0 | 1 — drives ±100% CSS commit animation
   isTransitioning: boolean
 }
 
@@ -28,6 +29,7 @@ export default function ImageGallery({
   images,
   currentIndex,
   dragOffset,
+  commitDir = 0,
   isTransitioning,
 }: Props) {
   if (images.length === 0) return null
@@ -45,7 +47,7 @@ export default function ImageGallery({
           key={offset}
           className={styles.slot}
           style={{
-            transform: `translateX(calc(${offset * 100}% + ${dragOffset}px))`,
+            transform: `translateX(calc(${offset * 100}% + ${dragOffset}px + ${commitDir * -100}%))`,
             transition: isTransitioning ? 'transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
           }}
         >
