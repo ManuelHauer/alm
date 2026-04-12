@@ -46,11 +46,15 @@
   padding-bottom: 20px;
 }
 
-/* Desktop: links centered vertically in remaining space */
+/* Desktop: links centered vertically in remaining space, larger text */
 .rootDesktop .links {
   flex: 1;
   justify-content: center;
   padding-bottom: 0;
+}
+
+.rootDesktop .link {
+  font-size: 14px;
 }
 
 .link {

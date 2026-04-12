@@ -91,21 +91,24 @@ export default function DesktopScrollLayout({ entries }: Props) {
 
   // Compute stack width and inner height separately so entryNumber/title can
   // share the same width as the image without being overlaid on it.
+  // IMG_COL_PADDING is subtracted so the carousel never touches column edges.
   // maxH reduced to 0.78 to leave room above/below for the text labels.
+  const IMG_COL_PADDING = 20 // px each side
   const imageSize = useMemo(() => {
     if (!imgContainerSize || !focusedImages[curIdx]?.image) return null
     const { width: colW, height: colH } = imgContainerSize
+    const availW = colW - IMG_COL_PADDING * 2
     const img = focusedImages[curIdx].image
     const maxH = colH * 0.78
     const aspect = img.width / img.height
     let w: number, h: number
-    if (colW / maxH > aspect) {
+    if (availW / maxH > aspect) {
       // Height-constrained (portrait or very tall)
       h = maxH
       w = h * aspect
     } else {
       // Width-constrained (landscape)
-      w = colW
+      w = availW
       h = w / aspect
     }
     return { stackWidth: `${w}px`, innerHeight: `${h}px` }
@@ -335,24 +338,25 @@ export default function DesktopScrollLayout({ entries }: Props) {
                   ))}
                 </div>
 
-                {/* Dots — bottom center of image */}
-                {numImages > 1 && (
-                  <div className={styles.dots}>
-                    {focusedImages.map((_, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        className={`${styles.dot} ${i === curIdx ? styles.dotActive : ''}`}
-                        onClick={() => setImageIndex(i)}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        aria-label={`Image ${i + 1}`}
-                      />
-                    ))}
-                  </div>
-                )}
               </div>
 
-              {/* Title — below image */}
+              {/* Dots — below carousel, centered */}
+              {numImages > 1 && (
+                <div className={styles.dots}>
+                  {focusedImages.map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`${styles.dot} ${i === curIdx ? styles.dotActive : ''}`}
+                      onClick={() => setImageIndex(i)}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      aria-label={`Image ${i + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Title — below dots */}
               <span className={styles.imageTitle}>{focusedEntry?.title}</span>
             </div>
           )}
