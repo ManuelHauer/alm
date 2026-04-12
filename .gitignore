@@ -48,3 +48,8 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Claude Code internals
+.claude.json.backup.*
+.mcp-needs-auth-cache.json
+.file-history/
