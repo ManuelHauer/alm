@@ -1,0 +1,41 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity 300ms ease;
+}
+
+.fading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.text {
+  margin: 0;
+  padding: 0;
+  letter-spacing: 0.22em;
+  font-size: clamp(14px, 3.5vw, 28px);
+  color: #fff;
+  /* Tabular nums for stable width during cycling */
+  font-variant-numeric: tabular-nums;
+  /* Prevent wrapping mid-word */
+  white-space: nowrap;
+}
+
+.letter {
+  display: inline-block;
+  /* Fixed width per slot to prevent layout shift during cycling */
+  min-width: 0.6em;
+  text-align: center;
+}
+
+/* Space characters should still reserve space */
+.letter:empty {
+  min-width: 0.6em;
+}

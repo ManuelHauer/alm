@@ -1,3 +1,41 @@
+/* ── Skip-to-content link ───────────────────────────────────────── */
+
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  z-index: 10000;
+  padding: 8px 16px;
+  background: var(--alm-orange, #e85c23);
+  color: #fff;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  transition: top 150ms ease;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Skeleton shimmer keyframe ──────────────────────────────────── */
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
 @font-face {
   font-family: 'Vialog LT';
   src: url('/fonts/Vialog-LT-Regular.woff2') format('woff2'),

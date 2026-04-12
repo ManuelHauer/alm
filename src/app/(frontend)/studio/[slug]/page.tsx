@@ -31,7 +31,25 @@ export async function generateMetadata({ params }: Props) {
     limit: 1,
   })
   const page = docs[0]
-  return { title: page ? `${page.title} — alm` : 'Studio — alm' }
+  if (!page) return { title: 'Studio' }
+
+  const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
+  const heroMedia =
+    page.heroImage && typeof page.heroImage === 'object'
+      ? (page.heroImage as import('@/payload-types').Media)
+      : null
+  const ogImageUrl =
+    baseUrl && heroMedia?.sizes?.large?.url
+      ? `${baseUrl}${heroMedia.sizes.large.url}`
+      : undefined
+
+  return {
+    title: page.title,
+    openGraph: {
+      title: page.title,
+      ...(ogImageUrl && { images: [{ url: ogImageUrl, alt: page.title }] }),
+    },
+  }
 }
 
 export default async function StudioSubPage({ params }: Props) {

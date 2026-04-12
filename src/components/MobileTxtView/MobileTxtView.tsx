@@ -81,8 +81,9 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
       // smooth-scroll duration); prevents intermediate entries from overwriting
       // the intended active entry and causing flicker / "press twice" symptoms.
       isProgrammaticScrollRef.current = true
-      clearTimeout(programmaticScrollTimerRef.current)
-      programmaticScrollTimerRef.current = window.setTimeout(() => {
+      if (programmaticScrollTimerRef.current !== null)
+        clearTimeout(programmaticScrollTimerRef.current)
+      programmaticScrollTimerRef.current = setTimeout(() => {
         isProgrammaticScrollRef.current = false
       }, 500)
       container.scrollTo({

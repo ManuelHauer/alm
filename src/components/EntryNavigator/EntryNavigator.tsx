@@ -86,7 +86,7 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
       <div className={styles.mobileRoot}>
         <MobileNavRail />
 
-        <main className={styles.mobileMain}>
+        <div className={styles.mobileMain} role="region" aria-label="Entry viewer">
           {imgTxtView === 'img' ? (
             <MobileEntryView
               entry={currentEntry}
@@ -103,7 +103,7 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
               onSelectEntry={selectAndSwitchToImg}
             />
           )}
-        </main>
+        </div>
 
         {/* Search icon — fixed top-right corner with gradient */}
         <a href="/search" className={styles.mobileSearch} aria-label="Search">

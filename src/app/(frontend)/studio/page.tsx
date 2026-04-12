@@ -7,7 +7,8 @@ import MobileNavRail from '@/components/MobileNavRail/MobileNavRail'
 import styles from './studio.module.css'
 
 export const metadata = {
-  title: 'Studio — alm',
+  title: 'Studio',
+  description: 'About alm project — a multidisciplinary design studio led by Andrea Lenardin Madden.',
 }
 
 export default async function StudioOverviewPage() {

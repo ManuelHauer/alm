@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
 import EntryNavigator from '@/components/EntryNavigator/EntryNavigator'
@@ -8,14 +9,39 @@ type Props = {
   searchParams: Promise<{ from?: string }>
 }
 
-export async function generateMetadata({ params }: Props) {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const entries = await getAllEntries()
   const entry = entries.find((e) => e.slug === slug)
   if (!entry) return {}
+
+  const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
+  const ogImageUrl =
+    baseUrl && entry.images[0]?.image.sizes?.large?.url
+      ? `${baseUrl}${entry.images[0].image.sizes.large.url}`
+      : undefined
+
   return {
-    title: `${entry.title} — alm`,
+    title: entry.title,
     description: entry.plainDescription ?? undefined,
+    openGraph: {
+      title: entry.title,
+      description: entry.plainDescription ?? undefined,
+      ...(ogImageUrl && {
+        images: [
+          {
+            url: ogImageUrl,
+            width: entry.images[0].image.sizes?.large
+              ? entry.images[0].image.width
+              : undefined,
+            height: entry.images[0].image.sizes?.large
+              ? entry.images[0].image.height
+              : undefined,
+            alt: entry.title,
+          },
+        ],
+      }),
+    },
   }
 }
 

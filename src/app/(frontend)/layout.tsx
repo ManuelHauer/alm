@@ -1,18 +1,53 @@
 import React from 'react'
+import type { Metadata, Viewport } from 'next'
+import configPromise from '@payload-config'
+import { getPayload } from 'payload'
+import { unstable_cache } from 'next/cache'
+
+import IntroAnimation from '@/components/IntroAnimation/IntroAnimation'
 import './styles.css'
 
-export const metadata = {
-  description: 'A blank template using Payload in a Next.js app.',
-  title: 'Payload Blank Template',
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 }
+
+export const metadata: Metadata = {
+  title: {
+    default: 'alm',
+    template: '%s — alm',
+  },
+  description: 'alm project — editorial archive',
+  openGraph: {
+    siteName: 'alm project',
+    type: 'website',
+  },
+}
+
+// Cache site-settings for 60s to avoid a DB hit on every request
+const getCachedSiteSettings = unstable_cache(
+  async () => {
+    const payload = await getPayload({ config: configPromise })
+    return payload.findGlobal({ slug: 'site-settings' })
+  },
+  ['site-settings'],
+  { revalidate: 60 },
+)
 
 export default async function RootLayout(props: { children: React.ReactNode }) {
   const { children } = props
+  const siteSettings = await getCachedSiteSettings()
+  const introEnabled = siteSettings.introAnimation ?? true
 
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <main>{children}</main>
+        <IntroAnimation enabled={introEnabled} />
+        {/* skip-to-content link — visually hidden until focused */}
+        <a href="#main-content" className="skip-link">
+          Skip to content
+        </a>
+        <main id="main-content">{children}</main>
       </body>
     </html>
   )

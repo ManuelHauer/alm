@@ -9,7 +9,8 @@ import SearchView from './SearchView'
 import styles from './search.module.css'
 
 export const metadata = {
-  title: 'Search — alm',
+  title: 'Search',
+  description: 'Search the alm archive by title, year, place, or series.',
 }
 
 export default async function SearchPage() {
@@ -22,6 +23,8 @@ export default async function SearchPage() {
       depth: 1,
       sort: '-sortOrder',
       limit: 1000,
+      draft: false,
+      where: { _status: { equals: 'published' } },
     }),
     payload.find({
       collection: 'folios',

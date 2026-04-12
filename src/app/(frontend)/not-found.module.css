@@ -1,0 +1,43 @@
+.page {
+  display: flex;
+  flex-direction: row;
+  height: 100dvh;
+  background: #fafaf8;
+}
+
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+}
+
+.code {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--alm-orange, #e85c23);
+  margin: 0;
+}
+
+.message {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: #888;
+  margin: 0;
+}
+
+.link {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #888;
+  text-decoration: none;
+  margin-top: 8px;
+  transition: color 150ms ease;
+}
+
+.link:hover {
+  color: #111;
+}

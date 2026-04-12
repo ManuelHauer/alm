@@ -20,6 +20,7 @@ export default function EntryCard({ entry }: Props) {
             src={entry.firstImageThumbnailUrl}
             alt={entry.title}
             className={styles.thumbImg}
+            loading="lazy"
           />
         ) : (
           <div className={styles.thumbEmpty} />
