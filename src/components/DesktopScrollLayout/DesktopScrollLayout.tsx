@@ -340,24 +340,24 @@ export default function DesktopScrollLayout({ entries }: Props) {
 
               </div>
 
-              {/* Dots — below carousel, centered */}
-              {numImages > 1 && (
-                <div className={styles.dots}>
-                  {focusedImages.map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      className={`${styles.dot} ${i === curIdx ? styles.dotActive : ''}`}
-                      onClick={() => setImageIndex(i)}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      aria-label={`Image ${i + 1}`}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Title — below dots */}
-              <span className={styles.imageTitle}>{focusedEntry?.title}</span>
+              {/* Footer: title left + dots right, same row */}
+              <div className={styles.imageFooter}>
+                <span className={styles.imageTitle}>{focusedEntry?.title}</span>
+                {numImages > 1 && (
+                  <div className={styles.dots}>
+                    {focusedImages.map((_, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        className={`${styles.dot} ${i === curIdx ? styles.dotActive : ''}`}
+                        onClick={() => setImageIndex(i)}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        aria-label={`Image ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

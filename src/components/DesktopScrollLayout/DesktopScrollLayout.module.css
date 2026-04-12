@@ -139,11 +139,12 @@
   display: block;
 }
 
-/* Dots — below the carousel, centered in imageStack */
+/* Dots — right side of imageFooter row */
 .dots {
   display: flex;
   gap: 6px;
-  align-self: center;
+  flex-shrink: 0;
+  align-items: center;
   pointer-events: auto;
 }
 
@@ -163,8 +164,17 @@
   background: var(--alm-orange, #e85c23);
 }
 
-/* Title — below the image (or dots), left-aligned */
+/* imageFooter: title (left) + dots (right) on one line */
+.imageFooter {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+
+/* Title — left side of footer row */
 .imageTitle {
+  flex: 1;
   font-size: 12px;
   letter-spacing: 0.06em;
   color: #888;
