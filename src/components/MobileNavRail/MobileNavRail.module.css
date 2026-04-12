@@ -49,19 +49,7 @@
   padding-bottom: 20px;
 }
 
-/* Desktop: links centered vertically in remaining space, larger text */
-@media (min-width: 768px) {
-  .links {
-    flex: 1;
-    justify-content: center;
-    padding-bottom: 0;
-  }
-
-  .link {
-    font-size: 14px;
-  }
-}
-
+/* Base link — overridden by media query below */
 .link {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
@@ -77,4 +65,17 @@
 
 .link:hover {
   color: #111;
+}
+
+/* Desktop: links centered vertically in remaining space, larger text */
+@media (min-width: 768px) {
+  .links {
+    flex: 1;
+    justify-content: center;
+    padding-bottom: 0;
+  }
+
+  .link {
+    font-size: 14px;
+  }
 }

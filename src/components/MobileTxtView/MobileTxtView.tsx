@@ -31,11 +31,16 @@
  *   Thin border-bottom separates entries (same weight as the rail separator).
  */
 
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 
 import type { EntryDetail } from '@/types/entry'
 
 import styles from './MobileTxtView.module.css'
+
+export type MobileTxtViewHandle = {
+  /** Smoothly scroll the text column to show the entry with the given id. */
+  scrollToEntry: (id: number) => void
+}
 
 type Props = {
   entries: EntryDetail[]
@@ -47,12 +52,12 @@ type Props = {
 const FOCUS_LINE_RATIO = 0.3 // 30% from top of container
 const COPIES = 3
 
-export default function MobileTxtView({
+const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtView({
   entries,
   activeEntryId,
   onActivate,
   onSelectEntry,
-}: Props) {
+}, ref) {
   const scrollRef = useRef<HTMLDivElement>(null)
   // Keyed by `${entryId}-${copyIndex}` — we only track copy=1 (middle set).
   const entryRefs = useRef<Map<string, HTMLElement>>(new Map())
@@ -62,6 +67,22 @@ export default function MobileTxtView({
   // recomputing layout on every event.
   const middleStartRef = useRef(0)
   const middleHeightRef = useRef(0)
+
+  // Expose scrollToEntry to parent (DesktopScrollLayout keyboard nav)
+  useImperativeHandle(ref, () => ({
+    scrollToEntry: (id: number) => {
+      const container = scrollRef.current
+      const el = entryRefs.current.get(`${id}-1`)
+      if (!container || !el) return
+      const cRect = container.getBoundingClientRect()
+      const elRect = el.getBoundingClientRect()
+      const offsetInContainer = elRect.top - cRect.top + container.scrollTop
+      container.scrollTo({
+        top: offsetInContainer - cRect.height * FOCUS_LINE_RATIO,
+        behavior: 'smooth',
+      })
+    },
+  }))
 
   // Looped list: 3 copies — [0=pre-clone | 1=real | 2=post-clone]
   const loopedEntries = Array.from({ length: COPIES }).flatMap((_, copy) =>
@@ -214,4 +235,6 @@ export default function MobileTxtView({
       })}
     </div>
   )
-}
+})
+
+export default MobileTxtView

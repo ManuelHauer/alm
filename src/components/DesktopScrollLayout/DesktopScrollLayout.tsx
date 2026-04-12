@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import MobileNavRail from '@/components/MobileNavRail/MobileNavRail'
-import MobileTxtView from '@/components/MobileTxtView/MobileTxtView'
+import MobileTxtView, { type MobileTxtViewHandle } from '@/components/MobileTxtView/MobileTxtView'
 import type { EntryDetail } from '@/types/entry'
 
 import styles from './DesktopScrollLayout.module.css'
@@ -50,12 +50,18 @@ export default function DesktopScrollLayout({ entries, showBack = false }: Props
 
   // ── Resizable split ─────────────────────────────────────────────
   // Fraction of (viewport - rail) given to the image column. Default ~66%.
-  const [splitFraction, setSplitFraction] = useState(0.667)
+  const [splitFraction, setSplitFraction] = useState(0.74)
   const isDividerDragging = useRef(false)
   const dividerStartX = useRef(0)
-  const dividerStartFraction = useRef(0.667)
+  const dividerStartFraction = useRef(0.74)
   // Rail is always --rail-width (69px); no ref needed.
   const RAIL_W = 69
+
+  // ── Text column ref — for imperative scroll-to-entry ────────────
+  const txtViewRef = useRef<MobileTxtViewHandle>(null)
+  // Tracks whether focus last changed from keyboard (should scroll text col)
+  // vs. from text col scroll (should not scroll — would feedback-loop).
+  const focusSourceRef = useRef<'keyboard' | 'scroll'>('scroll')
 
   // ── Image column ref — for dimension measurement ─────────────────
   const imageColRef = useRef<HTMLElement>(null)
@@ -157,10 +163,21 @@ export default function DesktopScrollLayout({ entries, showBack = false }: Props
       e.preventDefault()
       if (e.key === 'ArrowDown') {
         const idx = entries.findIndex((en) => en.id === focusedIdRef.current)
-        if (idx !== -1) setFocusedId(entries[(idx + 1) % entries.length].id)
+        if (idx !== -1) {
+          const newEntry = entries[(idx + 1) % entries.length]
+          focusSourceRef.current = 'keyboard'
+          setFocusedId(newEntry.id)
+          // Scroll after React commits the new activeEntryId to MobileTxtView
+          setTimeout(() => txtViewRef.current?.scrollToEntry(newEntry.id), 0)
+        }
       } else if (e.key === 'ArrowUp') {
         const idx = entries.findIndex((en) => en.id === focusedIdRef.current)
-        if (idx !== -1) setFocusedId(entries[((idx - 1) + entries.length) % entries.length].id)
+        if (idx !== -1) {
+          const newEntry = entries[((idx - 1) + entries.length) % entries.length]
+          focusSourceRef.current = 'keyboard'
+          setFocusedId(newEntry.id)
+          setTimeout(() => txtViewRef.current?.scrollToEntry(newEntry.id), 0)
+        }
       } else if (e.key === 'ArrowLeft') {
         commitSwipeRef.current(-1)
       } else if (e.key === 'ArrowRight') {
@@ -228,7 +245,7 @@ export default function DesktopScrollLayout({ entries, showBack = false }: Props
         setDragOffset(0)
         return
       }
-      const threshold = (imageColRef.current?.clientWidth ?? 800) * 0.25
+      const threshold = (imageColRef.current?.clientWidth ?? 800) * 0.15
       const offset = dragOffsetRef.current
       if (offset > threshold) commitSwipe(-1)
       else if (offset < -threshold) commitSwipe(1)
@@ -378,6 +395,25 @@ export default function DesktopScrollLayout({ entries, showBack = false }: Props
                   ))}
                 </div>
 
+                {/* Invisible side click zones — advance carousel without visual indicators */}
+                {numImages > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.carouselPrevZone}
+                      onClick={() => commitSwipe(-1)}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      aria-label="Previous image"
+                    />
+                    <button
+                      type="button"
+                      className={styles.carouselNextZone}
+                      onClick={() => commitSwipe(1)}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      aria-label="Next image"
+                    />
+                  </>
+                )}
               </div>
 
               {/* Footer: title left + dots right, same row */}
@@ -415,9 +451,13 @@ export default function DesktopScrollLayout({ entries, showBack = false }: Props
       {/* ── 4. Text column ──────────────────────────────────────── */}
       <div className={styles.textCol}>
         <MobileTxtView
+          ref={txtViewRef}
           entries={entries}
           activeEntryId={focusedId}
-          onActivate={(entry) => setFocusedId(entry.id)}
+          onActivate={(entry) => {
+            focusSourceRef.current = 'scroll'
+            setFocusedId(entry.id)
+          }}
           onSelectEntry={(entry) => setFocusedId(entry.id)}
         />
       </div>
