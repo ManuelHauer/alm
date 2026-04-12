@@ -1,0 +1,89 @@
+/* Shared layout for /studio and /studio/[slug] */
+
+/* Outer wrapper: NavRail + content */
+.page {
+  display: flex;
+  flex-direction: row;
+  min-height: 100dvh;
+  background: #fafaf8;
+}
+
+.root {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Page content area — centered, max 700px */
+.content {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 60px 24px 80px;
+}
+
+/* Page title */
+.pageTitle {
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #111;
+  font-weight: 400;
+  margin: 0 0 40px;
+}
+
+/* Hero image */
+.hero {
+  width: 100%;
+  margin-bottom: 32px;
+}
+
+.heroImg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Studio overview: list of subpage links */
+.navList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.navItem a {
+  display: block;
+  padding: 14px 0;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #888;
+  text-decoration: none;
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.12);
+  transition: color 150ms ease;
+}
+
+.navItem:first-child a {
+  border-top: 0.5px solid rgba(0, 0, 0, 0.12);
+}
+
+.navItem a:hover {
+  color: var(--alm-orange, #e85c23);
+}
+
+/* Back link */
+.back {
+  display: inline-block;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #888;
+  text-decoration: none;
+  margin-bottom: 32px;
+  transition: color 150ms ease;
+}
+
+.back:hover {
+  color: var(--alm-orange, #e85c23);
+}

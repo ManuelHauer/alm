@@ -159,6 +159,13 @@ export default function MobileTxtView({
 
       if (bestEntry && bestEntry.id !== activeEntryId) {
         onActivate(bestEntry)
+        // Update URL without navigation so the back button and share links
+        // reflect the visible entry. Silent no-op on any error (e.g. SSR).
+        try {
+          window.history.replaceState(null, '', `/entry/${bestEntry.slug}`)
+        } catch {
+          // ignore
+        }
       }
     }
 

@@ -1,0 +1,64 @@
+.richText {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #111;
+  letter-spacing: 0.02em;
+}
+
+.richText p {
+  margin: 0 0 1em;
+}
+
+.richText p:last-child {
+  margin-bottom: 0;
+}
+
+.richText strong {
+  font-weight: 600;
+}
+
+.richText em {
+  font-style: italic;
+}
+
+.richText a {
+  color: var(--alm-orange, #e85c23);
+  text-decoration: none;
+}
+
+.richText a:hover {
+  text-decoration: underline;
+}
+
+.richText h1,
+.richText h2,
+.richText h3,
+.richText h4 {
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  margin: 1.5em 0 0.5em;
+  line-height: 1.3;
+}
+
+.richText h1 { font-size: 20px; }
+.richText h2 { font-size: 17px; }
+.richText h3 { font-size: 15px; }
+.richText h4 { font-size: 14px; }
+
+.richText ul,
+.richText ol {
+  margin: 0 0 1em 1.4em;
+  padding: 0;
+}
+
+.richText li {
+  margin-bottom: 0.3em;
+}
+
+.richText blockquote {
+  margin: 1em 0;
+  padding-left: 1em;
+  border-left: 2px solid var(--alm-orange, #e85c23);
+  color: #555;
+  font-style: italic;
+}

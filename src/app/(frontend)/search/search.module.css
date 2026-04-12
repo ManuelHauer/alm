@@ -1,0 +1,135 @@
+/* Outer wrapper: NavRail + content side by side */
+.page {
+  display: flex;
+  flex-direction: row;
+  min-height: 100dvh;
+  background: #fafaf8;
+}
+
+.root {
+  flex: 1;
+  min-width: 0;
+  padding: 40px 24px 80px;
+  max-width: 900px;
+}
+
+/* ── Search bar ─────────────────────────────────────────────────── */
+
+.searchBarWrap {
+  margin-bottom: 20px;
+}
+
+.searchInput {
+  width: 100%;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  color: #111;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 0;
+  padding: 8px 0;
+  outline: none;
+  font-family: var(--font-sans, sans-serif);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.searchInput::placeholder {
+  color: #aaa;
+}
+
+.searchInput:focus {
+  border-bottom-color: var(--alm-orange, #e85c23);
+}
+
+/* Hide native search clear button */
+.searchInput::-webkit-search-cancel-button {
+  display: none;
+}
+
+/* ── Folio chips ─────────────────────────────────────────────────── */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.chip {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border: 0.5px solid rgba(0, 0, 0, 0.3);
+  border-radius: 100px;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+  font-family: var(--font-sans, sans-serif);
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.chip:hover {
+  border-color: rgba(0, 0, 0, 0.5);
+  color: #111;
+}
+
+.chipActive {
+  background: var(--alm-orange, #e85c23);
+  border-color: var(--alm-orange, #e85c23);
+  color: #fff;
+}
+
+.chipActive:hover {
+  color: #fff;
+  border-color: var(--alm-orange, #e85c23);
+}
+
+/* ── Results ─────────────────────────────────────────────────────── */
+
+.resultsWrap {
+  min-height: 200px;
+}
+
+.status {
+  font-size: 14px;
+  color: #888;
+  letter-spacing: 0.05em;
+  padding-top: 40px;
+}
+
+/* Responsive grid: 2 columns mobile, 3 tablet, 4 desktop */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px 16px;
+}
+
+@media (min-width: 600px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .root {
+    padding: 60px 48px 80px;
+  }
+
+  .searchInput {
+    font-size: 32px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px 24px;
+  }
+}
+
+@media (min-width: 768px) {
+  .root {
+    max-width: none;
+  }
+}
