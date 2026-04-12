@@ -76,6 +76,12 @@
   cursor: pointer;
 }
 
+.floatingToggle:focus-visible {
+  outline: 1.5px solid var(--alm-orange, #e85c23);
+  outline-offset: 4px;
+  border-radius: 100px;
+}
+
 .toggleDisabled {
   opacity: 0.35;
   cursor: default;
