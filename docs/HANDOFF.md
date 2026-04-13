@@ -6,7 +6,7 @@
 > **For AI agents:** Read this entire file before writing any code.
 > Then read `docs/M3_STATUS.md` for the current UI component inventory.
 >
-> Last updated: 2026-04-12 | M1 ✅ M2 ✅ M3 ⬜ M4 ⬜ M5 ⬜ M6 ⬜
+> Last updated: 2026-04-13 | M1 ✅ M2 ✅ M3 ✅ M4 ✅ M5 ✅ M6 ⬜
 
 ---
 
@@ -339,13 +339,14 @@ No separate detail page.
   - `imageInner`: the carousel only (`carouselClip` + slots + dots overlay removed)
   - `imageFooter` (flex row): `imageTitle` (left, 12px) + `dots` (right, flex-shrink: 0)
 - Dots moved OUTSIDE the carousel — in `imageFooter` row, not inside `carouselClip`
-- Search icon: `position: absolute; top: 0; right: 0`, corner gradient, `public/search.svg`
+- Search icon: `position: absolute; top: 0; right: 0`, 44×44px, no gradient, `public/search.svg`
 - Pointer drag + horizontal wheel for carousel navigation
 - **Keyboard:** `↑`/`↓` = prev/next entry; `←`/`→` = carousel prev/next
   (implemented via `window.addEventListener('keydown', ...)` with `focusedIdRef` for closure safety)
 
 **Drag divider:**
-- `flex: 0 0 1px; cursor: col-resize; background: rgba(0,0,0,0.12)`
+- `flex: 0 0 3px` (hit area); visual line is `border-left: 0.5px solid #808080`
+- Hover/active: `border-left: 1px solid #525252`
 - Pointer events update `splitFraction` state (clamped 0.30–0.85)
 
 **Text column** (`textCol`):
@@ -394,74 +395,95 @@ Centered text column, `max-width: 700px`. Hero image if set. Rich text from DB.
 
 ---
 
-## 7. Repo Structure (actual, post-M3)
+## 7. Repo Structure (actual, post-M5)
 
 ```
 alm/
 ├── src/
 │   ├── app/
 │   │   ├── (frontend)/
-│   │   │   ├── page.tsx                    # Landing
-│   │   │   ├── entry/[slug]/page.tsx       # Direct entry link
-│   │   │   ├── search/page.tsx             # Search (M4)
-│   │   │   ├── studio/page.tsx
-│   │   │   ├── studio/[slug]/page.tsx
-│   │   │   ├── m2-prototype/page.tsx       # Dev-only demo (to be deleted)
-│   │   │   ├── styles.css                  # @font-face, CSS vars, body font
-│   │   │   └── layout.tsx
-│   │   ├── (payload)/admin/…               # Payload admin (auto-generated)
-│   │   └── api/entries/index/route.ts      # GET lightweight entry index
+│   │   │   ├── page.tsx                    # Landing — generateMetadata + OG image
+│   │   │   ├── entry/[slug]/page.tsx       # Direct entry link — generateMetadata + OG image
+│   │   │   ├── search/page.tsx             # Search + folio filter
+│   │   │   ├── search/SearchView.tsx       # Client component: bar + chips + results grid
+│   │   │   ├── studio/page.tsx             # Studio overview
+│   │   │   ├── studio/[slug]/page.tsx      # Studio subpage — Lexical rich text
+│   │   │   ├── not-found.tsx               # 404 page
+│   │   │   ├── error.tsx                   # 500 page ('use client')
+│   │   │   ├── styles.css                  # @font-face, CSS vars, :focus-visible, reduced-motion
+│   │   │   └── layout.tsx                  # async RSC: metadata template, IntroAnimation, skip link
+│   │   ├── (payload)/api/[...slug]/route.ts  # Payload REST API catch-all — DO NOT shadow with custom routes
+│   │   ├── api/
+│   │   │   ├── entries/index/route.ts      # GET /api/entries/index → lightweight EntryIndexItem[]
+│   │   │   ├── entries/by-slug/[slug]/route.ts  # GET /api/entries/by-slug/:slug → EntryDetail
+│   │   │   ├── search/route.ts             # GET /api/search?q=&folios=
+│   │   │   └── folios/route.ts             # GET /api/folios
+│   │   ├── robots.ts                       # /robots.txt
+│   │   └── sitemap.ts                      # /sitemap.xml (all entry slugs)
 │   ├── components/
 │   │   ├── EntryNavigator/                 # Mobile/desktop split, owns mode state
 │   │   │   ├── EntryNavigator.tsx          # isMobile detect, floating pill, search icon
-│   │   │   └── EntryNavigator.module.css
+│   │   │   └── EntryNavigator.module.css   # mobile layout; :focus-visible on toggle
 │   │   ├── DesktopScrollLayout/            # Self-contained 3-col desktop layout
 │   │   │   ├── DesktopScrollLayout.tsx     # NavRail + imageCol + divider + textCol
 │   │   │   └── DesktopScrollLayout.module.css
 │   │   ├── MobileNavRail/                  # Left vertical rail (mobile + desktop)
-│   │   │   ├── MobileNavRail.tsx           # desktop?: boolean prop
-│   │   │   └── MobileNavRail.module.css
+│   │   │   ├── MobileNavRail.tsx
+│   │   │   └── MobileNavRail.module.css    # :focus-visible on links
 │   │   ├── MobileEntryView/                # IMG mode: single entry, tap zones, carousel
 │   │   │   ├── MobileEntryView.tsx
 │   │   │   └── MobileEntryView.module.css
 │   │   ├── MobileTxtView/                  # TXT mode: infinite loop stream
-│   │   │   ├── MobileTxtView.tsx
+│   │   │   ├── MobileTxtView.tsx           # forwardRef, scrollToEntry, isProgrammaticScrollRef
 │   │   │   └── MobileTxtView.module.css
-│   │   ├── ImageGallery/                   # Shared carousel (used in MobileEntryView)
-│   │   │   ├── ImageGallery.tsx
+│   │   ├── ImageGallery/                   # Shared carousel (MobileEntryView + DesktopScrollLayout)
+│   │   │   ├── ImageGallery.tsx            # useReducedMotion + loading="lazy" on adjacent slots
 │   │   │   └── ImageGallery.module.css
-│   │   ├── Header/                         # ⚠️ SUPERSEDED — not rendered, delete in M4
-│   │   └── BottomNav/                      # ⚠️ SUPERSEDED — not rendered, delete in M4
+│   │   ├── IntroAnimation/                 # "NO COOKIES EVER" split-flap overlay
+│   │   │   ├── IntroAnimation.tsx          # sessionStorage guard, reduced-motion aware
+│   │   │   └── IntroAnimation.module.css
+│   │   ├── EntryCard/                      # Search result card
+│   │   │   ├── EntryCard.tsx               # loading="lazy" on thumbnail
+│   │   │   └── EntryCard.module.css
+│   │   └── RichText/                       # Lexical → HTML server component
+│   │       └── RichText.tsx
+│   ├── hooks/
+│   │   └── useReducedMotion.ts             # window.matchMedia('prefers-reduced-motion')
+│   ├── lib/
+│   │   └── getEntries.ts                   # getAllEntries(): draft:false + _status:published
 │   ├── payload/
 │   │   ├── payload.config.ts
-│   │   ├── collections/Entries.ts
+│   │   ├── collections/Entries.ts          # versions: { drafts: true }, access: _status published
 │   │   ├── collections/Folios.ts
 │   │   ├── collections/Media.ts
 │   │   ├── collections/StudioPages.ts
 │   │   ├── collections/Users.ts
-│   │   ├── globals/SiteSettings.ts
+│   │   ├── globals/SiteSettings.ts         # shuffleMode, introAnimation, instagramUrl, shopUrl
 │   │   └── hooks/
 │   │       ├── autoEntryNumber.ts
 │   │       ├── autoSlug.ts
-│   │       ├── extractPlainDescription.ts
+│   │       ├── extractPlainDescription.ts  # beforeChange: walks Lexical tree → plainDescription
 │   │       └── handleGifUpload.ts
 │   └── types/
-│       └── entry.ts                        # EntryDetail type (SSR'd into bundle)
+│       └── entry.ts                        # EntryDetail, EntryIndexItem, EntryImageItem
 ├── public/
-│   ├── alm_logo.svg                        # Grey rect + transparent letter cutouts
-│   ├── search.svg                          # fill="#808080" (not currentColor — img tag)
+│   ├── alm_logo.svg
+│   ├── search.svg
 │   └── fonts/
 │       ├── Vialog-LT-Regular.woff2
 │       └── Vialog-LT-Regular.woff
 ├── docs/
-│   ├── HANDOFF.md                          # ← THIS FILE (single source of truth)
-│   ├── M1_VERIFICATION.md                  # M1 audit trail
-│   ├── M2_VERIFICATION.md                  # M2 audit trail
-│   ├── M3_STATUS.md                        # M3 component inventory + CSS tokens
-│   └── DEPLOYMENT_NOTES.md                 # Local env + Docker M6 plan
+│   ├── HANDOFF.md                          # ← THIS FILE
+│   ├── M1_VERIFICATION.md
+│   ├── M2_VERIFICATION.md
+│   ├── M3_STATUS.md
+│   ├── M4_VERIFICATION.md
+│   ├── M5_VERIFICATION.md
+│   └── DEPLOYMENT_NOTES.md
 ├── scripts/
 │   ├── seed.ts                             # Idempotent seed (admin, 5 entries, 2 folios)
-│   └── migrate-wp.ts                       # M6: WordPress import
+│   ├── update-studio.ts                    # One-off: update studio page text in DB
+│   └── migrate-wp.ts                       # M6: WordPress import (not yet implemented)
 ├── next.config.ts                          # allowedDevOrigins: ['192.168.0.89'] for LAN dev
 ├── docker-compose.yml
 ├── Dockerfile
@@ -482,6 +504,10 @@ alm/
 8. `/entry/[slug]` renders the same navigator as `/`, not a separate page.
 9. Payload admin auth cookies acceptable; no custom auth system.
 10. Disable Cloudflare features that introduce visitor cookies.
+11. **NEVER** add custom routes at `api/entries/[dynamic]` — shadows Payload's REST API.
+    Use `api/entries/by-slug/[slug]` for slug-based lookups.
+12. `NEXT_PUBLIC_SERVER_URL` must be set to the production domain for OG image URLs.
+    Default in `.env`: `http://localhost:3000`.
 
 ---
 
@@ -558,33 +584,47 @@ mobile and desktop. No bottom nav. No scroll-snap on desktop.
 
 ---
 
-### M4: Search + Studio — ⬜ NOT STARTED
+### M4: Search + Studio — ✅ COMPLETE
 
-**Goal:** Search page + studio subpages complete. Clean up superseded components.
+**Status:** All tasks complete. Final commit: `ec06287`. See `docs/M4_VERIFICATION.md`.
 
-**Tasks:**
-1. Delete `Header` and `BottomNav` components (no longer rendered anywhere).
-2. Delete `/m2-prototype` route.
-3. Search API: `GET /api/search?q=...&folios=...` via Payload `where` queries.
-4. Search page: `SearchBar` (debounced 300ms) + `FolioChips` + results grid of `EntryCard`.
-5. `EntryCard`: thumbnail (grey placeholder if no image), entry number, title. Links to `/entry/[slug]`.
-6. Studio overview page + subpages rendering Lexical rich text.
-7. Wire `history.replaceState` in `MobileTxtView` scroll listener (desktop text column).
-8. Implement `RichTextRenderer` for Lexical JSON → HTML in TXT mode.
+**What was built:**
+- Search page (`/search`): debounced search bar + folio filter chips + results grid
+- `GET /api/search?q=&folios=` with published-only filter
+- `EntryCard` component with thumbnail + number + title
+- Studio overview + subpages with Lexical → HTML rich text (`RichText` server component)
+- `history.replaceState` in `MobileTxtView` scroll listener
+- Back button on entry pages when arriving from `/search`
+- Favicon (`src/app/icon.png`)
+
+**Key fixes in M4:**
+- Draft entries now hidden: `draft: false` + `where: { _status: 'published' }` in all entry queries
+  (`getEntries.ts`, `/api/entries/index`, `/api/entries/by-slug/[slug]`, `/api/search`)
+- Carousel commit animation: `commitDir` CSS `%` offset eliminates overshoot
+- Keyboard scroll-to-entry: `isProgrammaticScrollRef` suppresses `onActivate` during smooth scroll
+- Divider: `0.5px solid #808080`, 3px hit area, hover → `1px #525252`
+- Desktop search button: 44×44px, no gradient overlay on carousel
 
 ---
 
-### M5: Polish — ⬜ NOT STARTED
+### M5: Polish — ✅ COMPLETE
 
-**Tasks:**
-1. SEO: dynamic `<title>`, `<meta description>`, OG tags (first image as OG image).
-2. `IntroAnimation`: "NO COOKIES EVER", sessionStorage, 2.5s, skippable.
-3. Loading states: skeleton shimmer for entries/search, lazy image loading.
-4. Error pages: 404, 500.
-5. Accessibility: skip-to-content, ARIA labels, focus management on entry change.
-6. `prefers-reduced-motion`: disable all CSS transitions/animations.
-7. Lighthouse audit: target >90 all categories.
-8. Zero cookies on public pages (verify in devtools).
+**Status:** All tasks complete. Final commit: `0afd20c`. See `docs/M5_VERIFICATION.md`.
+
+**What was built:**
+- SEO: `generateMetadata` with OG image on all pages; title template `%s — alm`
+- `IntroAnimation`: "NO COOKIES EVER" split-flap, grey (#808080) bg, sessionStorage, 2.5s, skippable
+- Error pages: `not-found.tsx` (404) + `error.tsx` (500)
+- `robots.ts` + `sitemap.ts` (all published entry slugs)
+- Accessibility: skip-to-content link, `:focus-visible` global rule (orange ring), nested `<main>` fixed
+- `prefers-reduced-motion`: global CSS rule + `useReducedMotion` hook for JS inline transitions
+- Lazy loading: `loading="lazy"` on EntryCard thumbnails + off-screen carousel slots
+- `NEXT_PUBLIC_SERVER_URL` env var added (set to production domain before deploy)
+
+**Critical routing note:**
+`(payload)/api/[...slug]/route.ts` is Payload's REST catch-all. **Never add a custom route
+at `api/entries/[dynamic]`** — it will shadow Payload's numeric-ID endpoints and cause 405
+on PATCH/PUT/DELETE. Use `api/entries/by-slug/[slug]` for slug-based lookups.
 
 ---
 
@@ -626,8 +666,10 @@ cd ~/Code/alm
 pnpm install
 
 # .env (not committed)
-echo "DATABASE_URI=postgres://alm:alm@localhost:5432/alm" > .env
+echo "DATABASE_URL=postgres://alm:alm@localhost:5432/alm" > .env
 echo "PAYLOAD_SECRET=$(openssl rand -hex 32)" >> .env
+echo "NEXT_PUBLIC_SERVER_URL=http://localhost:3000" >> .env
+# For production: set NEXT_PUBLIC_SERVER_URL=https://almproject.com
 ```
 
 ### Daily dev
@@ -645,7 +687,10 @@ pnpm generate:types               # after schema changes
 |---|---|
 | `localhost:3000` | Main app |
 | `localhost:3000/admin` | Payload admin |
-| `localhost:3000/m2-prototype` | Old M2 demo (to be deleted) |
+| `localhost:3000/search` | Search page |
+| `localhost:3000/studio` | Studio overview |
+| `localhost:3000/robots.txt` | robots.txt (auto-generated) |
+| `localhost:3000/sitemap.xml` | sitemap (auto-generated) |
 | `192.168.0.89:3000` | LAN access (iPhone) |
 
 ---
