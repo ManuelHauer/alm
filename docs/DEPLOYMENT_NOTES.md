@@ -104,11 +104,15 @@ editing). Hillsboro → LA is ~10ms; Helsinki → LA is ~140ms. Better admin UX.
 - Public IPv6: ✅ (free)
 - Private Networks: off (single server, no need)
 
-**SSH key** (from `~/.ssh/id_ed25519.pub` on dev machine):
+**SSH access:**
+```bash
+ssh root@5.78.205.65
+# key: ~/.ssh/id_ed25519  passphrase: alm
+```
+Key name in Hetzner: `alm-hetzner`
 ```
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHtCYwQPIBca8rgOEqyv7eLUYFQO6OkUKmwK/mf+GF3k alm-hetzner
 ```
-Key name in Hetzner: `alm-hetzner`
 
 **Cloud-init** (ran on first boot, installs Coolify automatically):
 ```yaml
@@ -125,28 +129,38 @@ After ~5 min, Coolify is accessible at `http://<server-ip>:8000` for initial set
 
 ---
 
-## Production target (M6)
+## Production stack (as built, 2026-04-14)
 
-- **Host:** Hetzner Cloud VPS (CX22 or larger), Ubuntu 24.04 LTS
-- **Stack:** Docker Compose — postgres + Next.js app + Caddy reverse proxy
-- **Domain:** almproject.com (DNS to be cut over from current WordPress)
-- **TLS:** Caddy auto-provisions Let's Encrypt
-- **Backups:** Per handoff §11 — nightly `pg_dump` to S3-compatible
-  storage + `/media` rsync
-- **CI/CD:** GitHub Actions → SSH deploy → `docker compose pull && up -d`
-- **Cookieless constraint:** the public site sets zero cookies (handoff
-  §8.1, §8.9 exempts admin auth cookies behind /admin). No analytics
-  cookies, no consent banner, no cookie middleware on `(frontend)` routes.
+- **Host:** Hetzner CPX31, Ubuntu 24.04 LTS, `5.78.205.65`
+- **Stack:** Coolify managing a single Docker container (Next.js + Payload)
+- **Database:** Coolify-managed Postgres resource (`usvppwwx31tzkhjx9inol51d`)
+- **Media:** Named Docker volume → `/app/media` (persists across redeploys)
+- **CI/CD:** Coolify auto-deploys on push to `main` (webhook on GitHub)
+- **Current URL:** `http://utf3x8de87jjp59gi2egibfo.5.78.205.65.sslip.io`
+- **Domain:** almproject.com — DNS cutover pending (WordPress still live)
+- **TLS:** Coolify will provision Let's Encrypt once domain points to server
+- **Cookieless constraint:** public site sets zero cookies; admin auth cookies
+  are scoped to `/admin` only (handoff §8.1, §8.9)
 
-## Backup commands (will be cron'd in M6)
+## Backup commands (run on server via SSH)
+
+Production Postgres is a Coolify-managed container. Connect via `docker exec`:
 
 ```bash
-# Nightly DB dump
-pg_dump -Fc -h localhost -U alm alm > alm-$(date +%Y%m%d).dump
+# DB dump (run on server)
+docker exec usvppwwx31tzkhjx9inol51d pg_dump -U postgres postgres -Fc \
+  > /tmp/alm-$(date +%Y%m%d).dump
 
-# Restore
-pg_restore -h localhost -U alm -d alm --clean --if-exists alm-YYYYMMDD.dump
+# Copy dump off-server
+scp -i ~/.ssh/id_ed25519 root@5.78.205.65:/tmp/alm-YYYYMMDD.dump ./
 
-# Media sync (production → off-site)
-rsync -av --delete /opt/alm/media/ user@backup-host:/backups/alm/media/
+# Restore (wipe existing data first, then restore)
+docker exec usvppwwx31tzkhjx9inol51d psql -U postgres -d postgres \
+  -c "TRUNCATE entries, media, users, folios, studio_pages, payload_preferences, payload_locked_documents CASCADE;"
+docker cp alm-YYYYMMDD.dump usvppwwx31tzkhjx9inol51d:/tmp/
+docker exec usvppwwx31tzkhjx9inol51d pg_restore -U postgres -d postgres \
+  --data-only --no-owner --no-privileges /tmp/alm-YYYYMMDD.dump
+
+# Media files — copy from volume (find container name first)
+docker cp <app-container-id>:/app/media /tmp/media-backup/
 ```
