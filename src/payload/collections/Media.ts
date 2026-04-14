@@ -1,18 +1,14 @@
 import type { CollectionConfig } from 'payload'
 import path from 'path'
-import { fileURLToPath } from 'url'
 
 import { handleGifUpload } from '../hooks/handleGifUpload'
-
-const filename = fileURLToPath(import.meta.url)
-const dirname = path.dirname(filename)
 
 /**
  * Media — Payload's built-in upload collection. Per handoff §5.3.
  *
- * staticDir resolves relative to this file: src/payload/collections/Media.ts
- * → ../../../media (project root /media). The /media folder is in
- * .gitignore and will be a Docker volume mount in production.
+ * staticDir uses process.cwd() so it resolves correctly in both local dev
+ * (~/Code/alm → ~/Code/alm/media) and Docker standalone output (/app → /app/media).
+ * The /media folder is in .gitignore and is a Docker volume mount in production.
  *
  * GIF animation handling: handleGifUpload tags GIFs with isAnimatedGif.
  * Day-1 verification (2026-04-11) confirmed Sharp's resize variants DO
@@ -24,7 +20,7 @@ export const Media: CollectionConfig = {
     read: () => true,
   },
   upload: {
-    staticDir: path.resolve(dirname, '../../../media'),
+    staticDir: path.resolve(process.cwd(), 'media'),
     mimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
     imageSizes: [
       { name: 'thumbnail', width: 400, height: undefined, position: 'centre' },

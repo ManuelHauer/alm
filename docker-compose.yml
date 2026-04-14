@@ -1,43 +1,49 @@
-version: '3'
+# Production docker-compose for alm project.
+#
+# Usage (local test):
+#   cp .env.example .env && edit .env
+#   docker compose up --build
+#
+# Usage (Coolify / Hetzner):
+#   Configure env vars in Coolify UI — no .env file needed on the server.
+#   Coolify uses this file as the "Docker Compose" application definition.
+#
+# Volumes:
+#   pgdata — PostgreSQL data, persisted across restarts
+#   media  — Uploaded images, mounted at /app/media inside the app container
 
 services:
-  payload:
-    image: node:20-alpine
-    ports:
-      - '3000:3000'
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: alm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: alm
     volumes:
-      - .:/home/node/app
-      - node_modules:/home/node/app/node_modules
-    working_dir: /home/node/app/
-    command: sh -c "corepack enable && corepack prepare pnpm@latest --activate && pnpm install && pnpm dev"
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alm -d alm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
     depends_on:
-      - mongo
-      # - postgres
-    env_file:
-      - .env
-
-  # Ensure your DATABASE_URL uses 'mongo' as the hostname ie. mongodb://mongo/my-db-name
-  mongo:
-    image: mongo:latest
-    ports:
-      - '27017:27017'
-    command:
-      - --storageEngine=wiredTiger
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://alm:${POSTGRES_PASSWORD}@postgres:5432/alm
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:-https://almproject.com}
+      NODE_ENV: production
     volumes:
-      - data:/data/db
-    logging:
-      driver: none
-
-  # Uncomment the following to use postgres
-  # postgres:
-  #   restart: always
-  #   image: postgres:latest
-  #   volumes:
-  #     - pgdata:/var/lib/postgresql/data
-  #   ports:
-  #     - "5432:5432"
+      - media:/app/media
 
 volumes:
-  data:
-  # pgdata:
-  node_modules:
+  pgdata:
+  media:

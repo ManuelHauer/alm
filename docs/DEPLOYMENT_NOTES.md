@@ -83,6 +83,48 @@ provides a lightweight Docker engine without the Desktop GUI. Same
 `docker compose` workflow, no sudo required for install. Acceptable
 substitute for M6 if disk space or licensing is a concern.
 
+## Hetzner server (provisioned 2026-04-14)
+
+**Server:** `alm-prod`
+**Type:** CPX31 (4 vCPU, 8 GB RAM, 160 GB SSD, 20 TB traffic, ~€16/mo)
+**Location:** Hillsboro virtual DC 1 (us-west — low latency from LA where Andrea works)
+**OS:** Ubuntu 24.04 LTS
+**IPv4:** `5.78.205.65`
+**IPv6:** `2a01:4ff:1f0:51c3::/64`
+
+**Why Hillsboro over Helsinki:** Cloudflare CDN serves all media and static assets
+globally from the edge. What goes to the origin is Payload admin traffic (uploads,
+editing). Hillsboro → LA is ~10ms; Helsinki → LA is ~140ms. Better admin UX.
+
+**Why CPX31 over CXP32:** "Regular Performance" gives predictable CPU under load
+(Sharp image processing during uploads). CXP32 "Cost Optimized" is burstable/shared.
+
+**Networking:**
+- Public IPv4: ✅ (required for Cloudflare; ~€0.60/mo)
+- Public IPv6: ✅ (free)
+- Private Networks: off (single server, no need)
+
+**SSH key** (from `~/.ssh/id_ed25519.pub` on dev machine):
+```
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHtCYwQPIBca8rgOEqyv7eLUYFQO6OkUKmwK/mf+GF3k alm-hetzner
+```
+Key name in Hetzner: `alm-hetzner`
+
+**Cloud-init** (ran on first boot, installs Coolify automatically):
+```yaml
+#cloud-config
+package_update: true
+package_upgrade: true
+runcmd:
+  - curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+```
+After ~5 min, Coolify is accessible at `http://<server-ip>:8000` for initial setup.
+
+**Volumes:** none — 160 GB local SSD is sufficient for Postgres + media.
+**Placement Groups:** none (single server).
+
+---
+
 ## Production target (M6)
 
 - **Host:** Hetzner Cloud VPS (CX22 or larger), Ubuntu 24.04 LTS

@@ -2,6 +2,8 @@ import type { MetadataRoute } from 'next'
 
 import { getAllEntries } from '@/lib/getEntries'
 
+export const dynamic = 'force-dynamic'
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? 'https://almproject.com'
   const entries = await getAllEntries()

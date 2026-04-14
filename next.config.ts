@@ -7,6 +7,9 @@ const __filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(__filename)
 
 const nextConfig: NextConfig = {
+  // Required for the multi-stage Docker build (see Dockerfile).
+  // next build emits .next/standalone/ which includes only traced dependencies.
+  output: 'standalone',
   allowedDevOrigins: ['192.168.0.89'],
   images: {
     localPatterns: [

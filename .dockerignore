@@ -1,0 +1,18 @@
+# Don't copy these into the Docker build context.
+# Keeps the image lean and prevents dev data leaking into production.
+
+.git
+.next
+node_modules
+
+# Uploaded media — served from a Docker volume at runtime, not baked in
+media
+
+# Dev/test artifacts
+*.log
+*.dump
+.env
+.env.*
+
+# macOS
+.DS_Store

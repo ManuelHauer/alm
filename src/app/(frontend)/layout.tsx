@@ -24,6 +24,10 @@ export const metadata: Metadata = {
   },
 }
 
+// Force dynamic rendering so next build never tries to pre-render pages
+// that need a live database connection. All frontend pages inherit this.
+export const dynamic = 'force-dynamic'
+
 // Cache site-settings for 60s to avoid a DB hit on every request
 const getCachedSiteSettings = unstable_cache(
   async () => {

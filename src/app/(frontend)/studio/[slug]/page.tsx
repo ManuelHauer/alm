@@ -13,15 +13,6 @@ type Props = {
   params: Promise<{ slug: string }>
 }
 
-export async function generateStaticParams() {
-  const payload = await getPayload({ config: configPromise })
-  const { docs } = await payload.find({
-    collection: 'studio-pages',
-    limit: 100,
-  })
-  return docs.map((page) => ({ slug: page.pageSlug }))
-}
-
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params
   const payload = await getPayload({ config: configPromise })
