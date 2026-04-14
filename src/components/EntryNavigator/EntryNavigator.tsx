@@ -73,6 +73,9 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
     setImgTxtView('img')
   }
 
+  // Empty database — nothing to render yet
+  if (!currentEntry) return null
+
   const hasImages = currentEntry.images.length > 0
   const canToggle = hasImages || imgTxtView === 'txt'
 
