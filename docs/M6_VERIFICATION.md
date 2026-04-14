@@ -13,7 +13,7 @@
 |---|---|---|
 | Hetzner CPX31 provisioned | ✅ | Ubuntu 24.04, 5.78.205.65 |
 | Coolify installed + running | ✅ | http://5.78.205.65:8000 |
-| Coolify app service deployed | ✅ | Auto-deploy on push to `main` |
+| Coolify app service deployed | ✅ | Auto-deploy on push to `main` — GitHub webhook wired 2026-04-14 |
 | Coolify Postgres resource | ✅ | Managed separately from app container |
 | Persistent media volume | ✅ | Named Docker volume → `/app/media` |
 | `prodMigrations` wired | ✅ | Fixed: `push: true` is a no-op in production (NODE_ENV guard in Payload source); initial migration generated and runs on every cold boot (idempotent) |
@@ -23,6 +23,8 @@
 
 **Current app URL (sslip.io, temporary):**
 `http://utf3x8de87jjp59gi2egibfo.5.78.205.65.sslip.io`
+**User manually changed URL inside coolify to the server adress**
+`http://5.78.205.65`
 
 ---
 
@@ -76,9 +78,9 @@
 | Check | Status | Notes |
 |---|---|---|
 | SSH access works | ✅ | `root@5.78.205.65`, key `~/.ssh/id_ed25519`, passphrase `alm` |
-| Password auth disabled | ⬜ | Verify `/etc/ssh/sshd_config` PasswordAuthentication=no |
+| Password auth disabled | ✅ | `PasswordAuthentication no` set in `/etc/ssh/sshd_config`, SSH reloaded 2026-04-14 |
 | No accidental secrets in repo | ✅ | `.env` is gitignored; secrets only in Coolify env vars |
-| Admin user credentials sane | ⬜ | First-time setup at `/admin` not done yet |
+| Admin user credentials sane | ✅ | `admin@alm.local` (pw: NMguhHJX779j!) + `andrea@alm.local` (pw: Alm2024admin!) created directly in DB 2026-04-14 |
 
 ### 2.6 Final UX sanity
 
@@ -134,11 +136,12 @@ redeploy. Volume was configured in Coolify UI → Persistent Storage before goin
 
 ## 5. What's next (priority order)
 
-1. **Create admin user** — visit `/admin` on the sslip.io URL, complete first-time setup
-2. **Verify all public routes** — homepage, entry pages, search, studio
-3. **Test media upload** — upload one image via admin to confirm Sharp processing + volume persistence
-4. **Disable SSH password auth** — `PasswordAuthentication no` in sshd_config
-5. **WordPress export + migration** — when export is available (handoff §M6)
-6. **DNS cutover** — point almproject.com → 5.78.205.65; Coolify provisions SSL automatically
+1. **Verify all public routes** — homepage, entry pages, search, studio
+2. **Test media upload** — upload one image via admin to confirm Sharp processing + volume persistence
+3. **WordPress export + migration** — when export is available (handoff §M6)
+4. **DNS cutover** — point almproject.com → 5.78.205.65; Coolify provisions SSL automatically. After DNS is live:
+   - Update GitHub webhook URL from `http://` → `https://` and re-enable SSL verification (GitHub repo → Settings → Webhooks)
+   - Update the Coolify webhook secret to something that is not the admin password
+   - Confirm `NEXT_PUBLIC_SERVER_URL` build arg is still `https://almproject.com` in Coolify
 7. **Set up nightly backups** — cron pg_dump + media rsync (see DEPLOYMENT_NOTES.md)
 8. **UX smoke test** — mobile + desktop, intro animation, all interactions
