@@ -16,6 +16,7 @@ import { handleGifUpload } from '../hooks/handleGifUpload'
  */
 export const Media: CollectionConfig = {
   slug: 'media',
+  folders: true,
   access: {
     read: () => true,
   },

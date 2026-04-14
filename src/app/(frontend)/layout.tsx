@@ -50,6 +50,12 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
 
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Runs before React hydration: if the intro has already played,
+            stamp data-intro-played on <html> so the CSS rule below hides
+            #alm-intro before any paint — prevents the grey flash on reload. */}
+        <script dangerouslySetInnerHTML={{ __html: "try{if(sessionStorage.getItem('alm-intro-played'))document.documentElement.setAttribute('data-intro-played','');}catch(e){}" }} />
+      </head>
       <body>
         <IntroAnimation enabled={introEnabled} />
         {/* skip-to-content link — visually hidden until focused */}

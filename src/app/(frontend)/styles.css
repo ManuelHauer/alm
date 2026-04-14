@@ -1,3 +1,10 @@
+/* ── Intro animation: hide overlay instantly on repeat visits ───── */
+/* Inline <script> in <head> sets data-intro-played before React hydrates,
+   so this rule fires before any browser paint — zero grey flash on reload. */
+html[data-intro-played] #alm-intro {
+  display: none !important;
+}
+
 /* ── Skip-to-content link ───────────────────────────────────────── */
 
 .skip-link {

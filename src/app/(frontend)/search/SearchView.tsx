@@ -19,6 +19,14 @@ export default function SearchView({ initialEntries, folios }: Props) {
   const [results, setResults] = useState<EntryIndexItem[]>(initialEntries)
   const [loading, setLoading] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Auto-focus on desktop only (avoids keyboard pop-up on mobile)
+  useEffect(() => {
+    if (window.matchMedia('(min-width: 768px)').matches) {
+      inputRef.current?.focus()
+    }
+  }, [])
 
   const fetchResults = useCallback(async (q: string, folioSlugs: Set<string>) => {
     setLoading(true)
@@ -69,6 +77,7 @@ export default function SearchView({ initialEntries, folios }: Props) {
       {/* Search bar */}
       <div className={styles.searchBarWrap}>
         <input
+          ref={inputRef}
           type="search"
           value={query}
           onChange={handleQueryChange}

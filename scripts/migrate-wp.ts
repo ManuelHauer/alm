@@ -90,6 +90,17 @@ function extractText(val: unknown): string {
   return String(first ?? '')
 }
 
+/** URL-safe slug from a string (mirrors the autoSlug hook logic). */
+function slugify(input: string): string {
+  return input
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 /** Parse all [gallery ids="..."] shortcodes from WP body HTML. */
 function parseGalleryIds(html: string): string[] {
   const ids: string[] = []
@@ -202,7 +213,77 @@ function mimeFromUrl(url: string): string {
   return map[ext] ?? 'image/jpeg'
 }
 
+// ─── folio assignment ─────────────────────────────────────────────────────────
+
+/**
+ * Derive folio IDs from WP categories + tags.
+ *
+ * WP sub-cat → folio:
+ *   press                      → Press
+ *   book                       → Books
+ *   award                      → Awards
+ *   newsletter / newsletter hidden / postcard → Writing
+ *   news feed                  → News
+ *
+ * WP tags → folio (best-effort for almanac entries):
+ *   architecture               → Architecture
+ *   branding / packaging / graphics / design / identity / mural → Identity
+ *
+ * Fallback: if nothing matched → News
+ */
+function assignFolios(
+  categories: string[],
+  tags: string[],
+  folioMap: Map<string, number>,
+): number[] {
+  const ids = new Set<number>()
+
+  // Media sub-categories
+  if (categories.includes('press'))  ids.add(folioMap.get('press')!)
+  if (categories.includes('book'))   ids.add(folioMap.get('books')!)
+  if (categories.includes('award'))  ids.add(folioMap.get('awards')!)
+
+  // Almanac sub-categories
+  if (
+    categories.includes('newsletter') ||
+    categories.includes('newsletter hidden') ||
+    categories.includes('postcard')
+  ) ids.add(folioMap.get('writing')!)
+
+  if (categories.includes('news feed')) ids.add(folioMap.get('news')!)
+
+  // Work-type tags
+  const tagSet = new Set(tags.map((t) => t.toLowerCase()))
+  if (tagSet.has('architecture')) ids.add(folioMap.get('architecture')!)
+  if (
+    tagSet.has('branding') ||
+    tagSet.has('packaging') ||
+    tagSet.has('graphics') ||
+    tagSet.has('design') ||
+    tagSet.has('identity') ||
+    tagSet.has('mural')
+  ) ids.add(folioMap.get('identity')!)
+
+  // Fallback
+  if (ids.size === 0) ids.add(folioMap.get('news')!)
+
+  return [...ids].filter((id): id is number => id !== undefined)
+}
+
 // ─── Payload REST helpers ─────────────────────────────────────────────────────
+
+/** Returns a map of folio slug → id by reading the live server. */
+async function fetchFolioMap(token: string): Promise<Map<string, number>> {
+  const res = await fetch(`${PAYLOAD_URL}/api/folios`, {
+    headers: { Authorization: `JWT ${token}` },
+  })
+  if (!res.ok) throw new Error(`Failed to fetch folios: ${res.status}`)
+  // The custom /api/folios route returns a flat array
+  const data = (await res.json()) as Array<{ id: number; slug: string }>
+  const map = new Map<string, number>()
+  for (const f of data) map.set(f.slug, f.id)
+  return map
+}
 
 async function payloadLogin(): Promise<string> {
   const res = await fetch(`${PAYLOAD_URL}/api/users/login`, {
@@ -240,15 +321,33 @@ async function uploadMedia(
 }
 
 async function createEntry(token: string, entry: Record<string, unknown>): Promise<number> {
-  const res = await fetch(`${PAYLOAD_URL}/api/entries`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
-    body: JSON.stringify(entry),
-  })
+  const attempt = async (slug: string) => {
+    const res = await fetch(`${PAYLOAD_URL}/api/entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      body: JSON.stringify({ ...entry, slug }),
+    })
+    return res
+  }
+
+  // Try the preferred slug first, then fall back to slug-wpPostId
+  const preferred = entry.slug as string
+  let res = await attempt(preferred)
+
   if (!res.ok) {
     const txt = await res.text()
-    throw new Error(`Entry creation failed (${res.status}): ${txt.slice(0, 300)}`)
+    const isSlugConflict = txt.includes('"slug"') || txt.includes('slug')
+    if (isSlugConflict && entry.customFields) {
+      const wpId = (entry.customFields as Record<string, unknown>).wpPostId
+      const fallback = `${preferred}-${wpId}`
+      res = await attempt(fallback)
+    }
+    if (!res.ok) {
+      const txt2 = await res.text()
+      throw new Error(`Entry creation failed (${res.status}): ${txt2.slice(0, 300)}`)
+    }
   }
+
   const data = (await res.json()) as { doc: { id: number } }
   return data.doc.id
 }
@@ -275,15 +374,15 @@ async function findEntry(
   return { id: doc.id, imageCount: doc.images?.length ?? 0 }
 }
 
-async function patchEntryImages(
+async function patchEntry(
   token: string,
   id: number,
-  images: Array<{ image: number; caption: string }>,
+  data: Record<string, unknown>,
 ): Promise<void> {
   const res = await fetch(`${PAYLOAD_URL}/api/entries/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
-    body: JSON.stringify({ images }),
+    body: JSON.stringify(data),
   })
   if (!res.ok) {
     const txt = await res.text()
@@ -443,10 +542,11 @@ async function migrate() {
     return
   }
 
-  // 3. Login
+  // 3. Login + load folio map
   console.log('3/5  Logging in…')
   const token = await payloadLogin()
-  console.log('     OK')
+  const folioMap = await fetchFolioMap(token)
+  console.log(`     OK — ${folioMap.size} folios loaded: ${[...folioMap.keys()].join(', ')}`)
 
   // 4. Import
   console.log('4/5  Importing…\n')
@@ -461,14 +561,10 @@ async function migrate() {
       ? (extractYear(post.acfFields['publication_date'] ?? '') || String(post.date.getFullYear()))
       : String(post.date.getFullYear())
 
-    // Idempotency: skip if entry already exists AND has images.
-    // If it exists with 0 images (e.g. previous run had upload errors), patch images.
+    // Idempotency: if entry already exists, skip image re-upload but always
+    // re-apply folios (safe to patch repeatedly).
     const existing = await findEntry(token, post.title, year)
-    if (existing && existing.imageCount > 0) {
-      console.log(`  SKIP  "${post.title}" (${year}) — already has ${existing.imageCount} img(s)`)
-      skipped++
-      continue
-    }
+    const skipImageUpload = existing !== null && existing.imageCount > 0
 
     // Resolve images: gallery shortcode order first, fall back to parent-attached
     const imgIds = post.galleryIds.length > 0 ? post.galleryIds : post.parentAttachmentIds
@@ -476,9 +572,9 @@ async function migrate() {
       .map((id) => attachments.get(id))
       .filter((a): a is WpAttachment => a !== undefined)
 
-    // Upload images
+    // Upload images (skip if entry already has them)
     const uploadedImages: Array<{ image: number; caption: string }> = []
-    if (!skipImages) {
+    if (!skipImages && !skipImageUpload) {
       for (const img of imageList) {
         try {
           const buf = await downloadToBuffer(img.url)
@@ -504,6 +600,9 @@ async function migrate() {
     // sortOrder: date as YYYYMMDD so it's naturally sortable
     const sortOrder = parseInt(post.date.toISOString().slice(0, 10).replace(/-/g, ''), 10)
 
+    // Folios
+    const folioIds = assignFolios(post.categories, post.tags, folioMap)
+
     // customFields
     const customFields: Record<string, unknown> = {
       wpPostId: post.id,
@@ -524,32 +623,37 @@ async function migrate() {
     }
 
     const type = isMedia ? 'media  ' : 'almanac'
-    const imgNote = skipImages
-      ? '(imgs skipped)'
-      : `${uploadedImages.length}/${imageList.length} imgs`
+    const imgNote = skipImageUpload
+      ? `${existing!.imageCount} imgs (kept)`
+      : skipImages
+        ? '(imgs skipped)'
+        : `${uploadedImages.length}/${imageList.length} imgs`
 
     if (existing) {
-      // Entry exists but had 0 images — patch with newly uploaded images
-      if (uploadedImages.length > 0) {
-        await patchEntryImages(token, existing.id, uploadedImages)
-        console.log(`  PATCH ${type}  "${post.title}" (${year}) — ${imgNote}`)
-      } else {
-        console.log(`  SKIP  "${post.title}" (${year}) — exists, still 0 imgs uploadable`)
-      }
+      // Patch folios (always) + new images (only if entry had none before)
+      const patch: Record<string, unknown> = { folios: folioIds }
+      if (uploadedImages.length > 0) patch.images = uploadedImages
+      await patchEntry(token, existing.id, patch)
       skipped++
+      console.log(`  PATCH ${type}  "${post.title}" (${year}) — ${imgNote} | folios: [${folioIds.join(',')}]`)
     } else {
+      // Prefer the WP post_name slug (already URL-safe + unique in WP).
+      // If it's purely numeric (auto-assigned by WP), fall back to title slug.
+      const wpSlug = post.slug && /[a-z]/.test(post.slug) ? post.slug : slugify(post.title)
       await createEntry(token, {
+        slug: wpSlug,
         title: post.title,
         year,
         place: '',
         description,
         images: uploadedImages,
+        folios: folioIds,
         sortOrder,
         _status: 'published',
         customFields,
       })
       created++
-      console.log(`  OK  ${type}  "${post.title}" (${year}) — ${imgNote}`)
+      console.log(`  OK  ${type}  "${post.title}" (${year}) — ${imgNote} | folios: [${folioIds.join(',')}]`)
     }
   }
 

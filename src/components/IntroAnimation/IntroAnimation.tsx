@@ -46,9 +46,9 @@ export default function IntroAnimation({ enabled }: Props) {
   // page is never shown before this component decides whether to play or hide.
   const [visible, setVisible] = useState(true)
   const [fading, setFading] = useState(false)
-  // letters start as the final text (stable for SSR); randomised client-side
-  // before the animation starts.
-  const [letters, setLetters] = useState<string[]>(TEXT.split(''))
+  // letters start empty (no text in SSR HTML / before animation kicks off),
+  // preventing the brief "NO COOKIES EVER" flash before scrambling begins.
+  const [letters, setLetters] = useState<string[]>([])
   const lockedRef = useRef<boolean[]>(TEXT.split('').map(() => false))
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -137,6 +137,7 @@ export default function IntroAnimation({ enabled }: Props) {
 
   return (
     <div
+      id="alm-intro"
       className={`${styles.overlay} ${fading ? styles.fading : ''}`}
       onClick={dismiss}
       role="status"

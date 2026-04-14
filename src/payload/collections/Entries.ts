@@ -41,7 +41,8 @@ export const Entries: CollectionConfig = {
       unique: true,
       index: true,
       admin: {
-        description: 'Auto-assigned. Override only if needed.',
+        readOnly: true,
+        description: 'Auto-assigned on create. Cannot be edited manually.',
       },
     },
     {
