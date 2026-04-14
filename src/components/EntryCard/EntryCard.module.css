@@ -28,7 +28,18 @@
 .thumbEmpty {
   width: 100%;
   height: 100%;
-  background: #efefea;
+  background-color: #efefea;
+  /* Three horizontal rules of decreasing width — text-document pictogram */
+  background-image:
+    linear-gradient(#c2c2bc 0px, #c2c2bc 100%),
+    linear-gradient(#c2c2bc 0px, #c2c2bc 100%),
+    linear-gradient(#c2c2bc 0px, #c2c2bc 100%);
+  background-size: 62% 1.5px, 48% 1.5px, 28% 1.5px;
+  background-position:
+    center calc(50% - 9px),
+    center 50%,
+    center calc(50% + 9px);
+  background-repeat: no-repeat;
 }
 
 /* Meta row: number + title */

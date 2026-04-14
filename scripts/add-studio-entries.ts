@@ -160,7 +160,8 @@ async function uploadMedia(token: string, filePath: string, alt: string): Promis
   const bytes = fs.readFileSync(filePath)
   const blob = new Blob([bytes], { type: 'image/jpeg' })
   form.append('file', blob, path.basename(filePath))
-  form.append('alt', alt)
+  // Payload 3 multipart: non-file fields must be in a _payload JSON string
+  form.append('_payload', JSON.stringify({ alt: alt || path.basename(filePath) }))
 
   const res = await fetch(`${PAYLOAD_URL}/api/media`, {
     method: 'POST',
@@ -174,7 +175,36 @@ async function uploadMedia(token: string, filePath: string, alt: string): Promis
   return id
 }
 
-async function createEntry(
+/** Derive slug the same way the autoSlug hook does. */
+function slugify(input: string): string {
+  return input
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+/** Returns the existing entry ID if a matching slug already exists, else null. */
+async function findBySlug(token: string, slug: string): Promise<number | null> {
+  const res = await fetch(
+    `${PAYLOAD_URL}/api/entries?where[slug][equals]=${encodeURIComponent(slug)}&limit=1`,
+    { headers: { Authorization: `JWT ${token}` } },
+  )
+  if (!res.ok) return null
+  const data = await res.json() as { docs?: Array<{ id: number }> }
+  return data.docs?.[0]?.id ?? null
+}
+
+async function deleteEntry(token: string, id: number): Promise<void> {
+  await fetch(`${PAYLOAD_URL}/api/entries/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `JWT ${token}` },
+  })
+}
+
+async function upsertEntry(
   token: string,
   entry: (typeof ENTRIES)[number],
   mediaId: number | null,
@@ -208,17 +238,30 @@ async function createEntry(
   // Remove undefined fields
   Object.keys(body).forEach((k) => body[k] === undefined && delete body[k])
 
-  const res = await fetch(`${PAYLOAD_URL}/api/entries`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `JWT ${token}`,
-    },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`Create entry failed: ${res.status} ${await res.text()}`)
-  const data = await res.json() as { doc?: { id?: number; entryNumber?: number } }
-  console.log(`  ✓ Created: entry #${data.doc?.entryNumber} id=${data.doc?.id}`)
+  const slug = slugify(entry.title)
+  const existingId = await findBySlug(token, slug)
+
+  if (existingId) {
+    // Update existing entry
+    const res = await fetch(`${PAYLOAD_URL}/api/entries/${existingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) throw new Error(`Update entry failed: ${res.status} ${await res.text()}`)
+    const data = await res.json() as { doc?: { id?: number; entryNumber?: number } }
+    console.log(`  ↺ Updated: entry #${data.doc?.entryNumber} id=${data.doc?.id}`)
+  } else {
+    // Create new entry
+    const res = await fetch(`${PAYLOAD_URL}/api/entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `JWT ${token}` },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) throw new Error(`Create entry failed: ${res.status} ${await res.text()}`)
+    const data = await res.json() as { doc?: { id?: number; entryNumber?: number } }
+    console.log(`  ✓ Created: entry #${data.doc?.entryNumber} id=${data.doc?.id}`)
+  }
 }
 
 // ─── main ─────────────────────────────────────────────────────────────────────
@@ -235,6 +278,16 @@ async function main() {
   console.log(`Logging in to ${PAYLOAD_URL}…`)
   const token = await login()
   console.log('Logged in.\n')
+
+  // Clean up the 3 image-less entries created in a failed earlier run
+  // (IDs 226, 227, 228 — DESERT GOLD, EMBASSY FOR WOMEN, UNA A LA VOLTA)
+  const STALE_IDS = [226, 227, 228]
+  console.log('Deleting stale image-less entries from previous run…')
+  for (const id of STALE_IDS) {
+    await deleteEntry(token, id)
+    console.log(`  Deleted id=${id}`)
+  }
+  console.log()
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'alm-entries-'))
 
@@ -265,7 +318,7 @@ async function main() {
       console.log(`  No image for this entry.`)
     }
 
-    await createEntry(token, entry, mediaId)
+    await upsertEntry(token, entry, mediaId)
   }
 
   // Cleanup temp dir
