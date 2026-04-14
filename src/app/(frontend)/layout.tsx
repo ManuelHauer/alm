@@ -40,8 +40,13 @@ const getCachedSiteSettings = unstable_cache(
 
 export default async function RootLayout(props: { children: React.ReactNode }) {
   const { children } = props
-  const siteSettings = await getCachedSiteSettings()
-  const introEnabled = siteSettings.introAnimation ?? true
+  let introEnabled = true
+  try {
+    const siteSettings = await getCachedSiteSettings()
+    introEnabled = siteSettings.introAnimation ?? true
+  } catch {
+    // DB unavailable on first boot — use defaults so the page still renders
+  }
 
   return (
     <html lang="en" suppressHydrationWarning>
