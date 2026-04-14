@@ -7,6 +7,13 @@
  * Skippable on tap/click. Disabled via site-settings.introAnimation = false.
  * Respects prefers-reduced-motion: skips the cycling effect, shows text briefly.
  *
+ * Flash prevention:
+ *   The overlay starts VISIBLE in the initial render (server + client), so the
+ *   main page is never exposed before the intro plays. A useLayoutEffect runs
+ *   synchronously before the first browser paint: if the intro has already
+ *   played (sessionStorage), it hides the overlay immediately (no flash of the
+ *   overlay either, since useLayoutEffect fires before paint).
+ *
  * Timing (normal):
  *   - Characters cycle ~60ms each (random char set)
  *   - Lock-in from left to right, 110ms apart
@@ -14,7 +21,7 @@
  *   - Hold 400ms · Fade out 300ms → total ~2540ms ≈ 2.5s
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import styles from './IntroAnimation.module.css'
 
@@ -35,9 +42,13 @@ type Props = {
 }
 
 export default function IntroAnimation({ enabled }: Props) {
-  const [visible, setVisible] = useState(false)
+  // Start VISIBLE so the overlay is part of the initial SSR HTML — the main
+  // page is never shown before this component decides whether to play or hide.
+  const [visible, setVisible] = useState(true)
   const [fading, setFading] = useState(false)
-  const [letters, setLetters] = useState<string[]>(() => TEXT.split('').map(() => randomChar()))
+  // letters start as the final text (stable for SSR); randomised client-side
+  // before the animation starts.
+  const [letters, setLetters] = useState<string[]>(TEXT.split(''))
   const lockedRef = useRef<boolean[]>(TEXT.split('').map(() => false))
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -52,16 +63,25 @@ export default function IntroAnimation({ enabled }: Props) {
     )
   }
 
+  // Hide the overlay synchronously before the first browser paint if it
+  // shouldn't be shown. This is the core fix for the "flash of main page".
+  useLayoutEffect(() => {
+    if (!enabled || sessionStorage.getItem('alm-intro-played')) {
+      setVisible(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // mount only — enabled is stable
+
+  // Start the animation. Runs after useLayoutEffect, so if visible was set
+  // to false above, this early-returns immediately.
   useEffect(() => {
     if (!enabled) return
     if (sessionStorage.getItem('alm-intro-played')) return
     sessionStorage.setItem('alm-intro-played', '1')
-    setVisible(true)
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     if (reducedMotion) {
-      // Just show the text for a moment, then fade
       setLetters(TEXT.split(''))
       lockedRef.current = TEXT.split('').map(() => true)
       const t1 = setTimeout(() => setFading(true), 800)
@@ -69,6 +89,10 @@ export default function IntroAnimation({ enabled }: Props) {
       timersRef.current = [t1, t2]
       return
     }
+
+    // Randomise letters immediately (client-only, runs before first user paint)
+    setLetters(TEXT.split('').map(() => randomChar()))
+    lockedRef.current = TEXT.split('').map(() => false)
 
     // Cycle all characters
     intervalRef.current = setInterval(() => {
@@ -118,10 +142,11 @@ export default function IntroAnimation({ enabled }: Props) {
       role="status"
       aria-live="polite"
       aria-label="No cookies ever"
+      suppressHydrationWarning
     >
-      <p className={styles.text} aria-hidden="true">
+      <p className={styles.text} aria-hidden="true" suppressHydrationWarning>
         {letters.map((char, i) => (
-          <span key={i} className={styles.letter}>
+          <span key={i} className={styles.letter} suppressHydrationWarning>
             {char}
           </span>
         ))}

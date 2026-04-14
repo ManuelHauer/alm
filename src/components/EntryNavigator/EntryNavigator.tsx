@@ -14,7 +14,7 @@
  * URL sync: history.replaceState(/entry/[slug]) whenever currentEntry changes.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import DesktopScrollLayout from '@/components/DesktopScrollLayout/DesktopScrollLayout'
 import MobileEntryView from '@/components/MobileEntryView/MobileEntryView'
@@ -65,6 +65,26 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
     const i = entries.findIndex((e) => e.id === currentEntry.id)
     setActiveEntry(entries[wrapIdx(i + 1, entries.length)])
   }
+
+  // Preload adjacent entries' first images so they're in cache when navigated to.
+  const preloadedRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const i = entries.findIndex((e) => e.id === currentEntry.id)
+    const neighbours = [
+      entries[wrapIdx(i - 1, entries.length)],
+      entries[wrapIdx(i + 1, entries.length)],
+    ]
+    for (const neighbour of neighbours) {
+      const img = neighbour?.images[0]?.image
+      if (!img) continue
+      // Prefer thumbnail on mobile (sizeHint), fall back to medium then original
+      const url = img.sizes?.thumbnail?.url ?? img.sizes?.medium?.url ?? img.url
+      if (!url || preloadedRef.current.has(url)) continue
+      preloadedRef.current.add(url)
+      const el = new window.Image()
+      el.src = url
+    }
+  }, [currentEntry, entries])
 
   // Tap on a TXT entry → make it current AND switch to IMG mode.
   const selectAndSwitchToImg = (entry: EntryDetail) => {

@@ -6,32 +6,19 @@
  * Looping strategy:
  *   Renders entries 3× [clone | real | clone].
  *   On mount: instant-jump scrollTop to put the active entry in the middle
- *   set at the 30% focus line.
+ *   set at the 50% focus line (vertical centre).
  *   On scroll: when scrollTop exits the middle set's bounds, teleport
  *   ± middleSetHeight (no animation). Content at old/new position is
  *   identical, so no visual jump.
  *
- * Scroll hijacking is gone:
- *   Auto-scroll runs only ONCE (on mount, instant). The scroll listener
- *   updates activeEntryId for mode-switch purposes but never triggers
- *   another scrollTo.
- *
- * Tap:
- *   Clicking an entry calls onSelectEntry — EntryNavigator sets that
- *   entry as current and switches to IMG mode.
- *
- * Layout per entry:
- *   ┌─(44px col)──┬──(content)─────────────────────┐
- *   │   [012]     │                   Project Title │  ← right-aligned
- *   │             │              year · place       │  ← right-aligned
- *   │             │  Justified description text     │
- *   │             │  last line left-aligned.        │
- *   └─────────────┴─────────────────────────────────┘
- *
- *   Thin border-bottom separates entries (same weight as the rail separator).
+ * Performance:
+ *   Entry offsets are pre-computed once after layout and cached.
+ *   The scroll handler uses ONLY scrollTop + cached values — zero
+ *   getBoundingClientRect() calls in the hot path.
+ *   Detection is throttled to one RAF per scroll burst.
  */
 
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 
 import type { EntryDetail } from '@/types/entry'
 
@@ -63,8 +50,25 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
   const entryRefs = useRef<Map<string, HTMLElement>>(new Map())
   const hasInitialScrolled = useRef(false)
 
-  // Store middle-set bounds so the scroll listener can teleport without
-  // recomputing layout on every event.
+  // ── Pre-computed scroll offsets (middle-set, relative to container origin) ──
+  // Avoids getBoundingClientRect() in the scroll hot path.
+  // offset = position from the top of the scrollable content (stable, not viewport-relative).
+  const entryScrollOffsetsRef = useRef<Map<number, number>>(new Map())
+
+  const computeScrollOffsets = useCallback(() => {
+    const container = scrollRef.current
+    if (!container) return
+    const cTop = container.getBoundingClientRect().top
+    const map = new Map<number, number>()
+    for (const entry of entries) {
+      const el = entryRefs.current.get(`${entry.id}-1`)
+      if (!el) continue
+      map.set(entry.id, el.getBoundingClientRect().top - cTop + container.scrollTop)
+    }
+    entryScrollOffsetsRef.current = map
+  }, [entries])
+
+  // Store middle-set bounds for loop teleport (also pre-computed).
   const middleStartRef = useRef(0)
   const middleHeightRef = useRef(0)
 
@@ -98,7 +102,7 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
     entries.map((e) => ({ entry: e, copy })),
   )
 
-  // Compute middle-set geometry once after initial layout.
+  // Compute offsets + middle-set bounds after layout, and on resize.
   useLayoutEffect(() => {
     const container = scrollRef.current
     if (!container) return
@@ -116,7 +120,15 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
 
     middleStartRef.current = middleStart
     middleHeightRef.current = middleEnd - middleStart
-  }, [entries])
+
+    computeScrollOffsets()
+  }, [entries, computeScrollOffsets])
+
+  // Re-compute offsets on viewport resize (font scaling, orientation change).
+  useEffect(() => {
+    window.addEventListener('resize', computeScrollOffsets, { passive: true })
+    return () => window.removeEventListener('resize', computeScrollOffsets)
+  }, [computeScrollOffsets])
 
   // Initial scroll: jump instantly to active entry in the middle set.
   useLayoutEffect(() => {
@@ -136,77 +148,78 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // mount only — no dep on activeEntryId, intentional
 
-  // Guard: suppress onActivate during programmatic smooth scroll triggered
-  // by keyboard nav, preventing intermediate entries from flickering in.
   const isProgrammaticScrollRef = useRef(false)
   const programmaticScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Guard: skip active-entry detection in the same tick as a teleport,
-  // which prevents briefly highlighting the wrong entry at loop boundaries.
   const isTeleportingRef = useRef(false)
+  // RAF handle for throttling detection to one frame per scroll burst
+  const detectRafRef = useRef<number | null>(null)
 
   // Scroll listener: teleport at boundaries + update active entry.
+  // Hot-path uses ONLY scrollTop + pre-computed values (no getBoundingClientRect).
   useEffect(() => {
     const container = scrollRef.current
     if (!container) return
 
     const onScroll = () => {
-      // ── Loop teleport ──
+      // ── Loop teleport (always immediate, no DOM reads) ──
       const middleStart = middleStartRef.current
       const middleHeight = middleHeightRef.current
       if (middleHeight > 0) {
-        const didTeleport =
-          container.scrollTop < middleStart ||
-          container.scrollTop >= middleStart + middleHeight
-        if (didTeleport) {
+        const st = container.scrollTop
+        if (st < middleStart || st >= middleStart + middleHeight) {
           isTeleportingRef.current = true
-          if (container.scrollTop < middleStart) {
-            container.scrollTop += middleHeight
-          } else {
-            container.scrollTop -= middleHeight
-          }
-          // Clear flag after browser has settled the new scroll position
-          requestAnimationFrame(() => {
-            isTeleportingRef.current = false
-          })
-          return // skip detection this tick; next scroll event will re-detect
+          container.scrollTop = st < middleStart
+            ? st + middleHeight
+            : st - middleHeight
+          requestAnimationFrame(() => { isTeleportingRef.current = false })
+          return
         }
       }
 
       if (isTeleportingRef.current) return
       if (isProgrammaticScrollRef.current) return
 
-      // ── Active entry detection (middle-set refs only) ──
-      const cRect = container.getBoundingClientRect()
-      const focusY = cRect.top + cRect.height * FOCUS_LINE_RATIO
+      // ── Active entry detection — throttled to one RAF per scroll burst ──
+      if (detectRafRef.current !== null) return
+      detectRafRef.current = requestAnimationFrame(() => {
+        detectRafRef.current = null
 
-      let bestEntry: EntryDetail | null = null
-      let bestTop = -Infinity
+        const scrollTop = container.scrollTop
+        const containerHeight = container.clientHeight
+        const threshold = scrollTop + containerHeight * FOCUS_LINE_RATIO
 
-      for (const entry of entries) {
-        const el = entryRefs.current.get(`${entry.id}-1`)
-        if (!el) continue
-        const top = el.getBoundingClientRect().top
-        if (top <= focusY && top > bestTop) {
-          bestTop = top
-          bestEntry = entry
+        let bestId: number | null = null
+        let bestOffset = -Infinity
+
+        for (const [id, offset] of entryScrollOffsetsRef.current) {
+          if (offset <= threshold && offset > bestOffset) {
+            bestOffset = offset
+            bestId = id
+          }
         }
-      }
 
-      if (bestEntry && bestEntry.id !== activeEntryId) {
-        onActivate(bestEntry)
-        // Update URL without navigation so the back button and share links
-        // reflect the visible entry. Silent no-op on any error (e.g. SSR).
-        try {
-          window.history.replaceState(null, '', `/entry/${bestEntry.slug}`)
-        } catch {
-          // ignore
+        if (bestId !== null && bestId !== activeEntryId) {
+          const bestEntry = entries.find((e) => e.id === bestId)
+          if (bestEntry) {
+            onActivate(bestEntry)
+            try {
+              window.history.replaceState(null, '', `/entry/${bestEntry.slug}`)
+            } catch {
+              // ignore
+            }
+          }
         }
-      }
+      })
     }
 
     container.addEventListener('scroll', onScroll, { passive: true })
-    return () => container.removeEventListener('scroll', onScroll)
+    return () => {
+      container.removeEventListener('scroll', onScroll)
+      if (detectRafRef.current !== null) {
+        cancelAnimationFrame(detectRafRef.current)
+        detectRafRef.current = null
+      }
+    }
   }, [entries, activeEntryId, onActivate])
 
   return (
@@ -226,12 +239,10 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
             onClick={() => onSelectEntry(entry)}
             className={`${styles.entry} ${isActive ? styles.entryActive : ''}`}
           >
-            {/* Entry number sits in the left padding column */}
             <span className={styles.entryNumber}>
               {String(entry.entryNumber).padStart(3, '0')}
             </span>
 
-            {/* Text content fills the right portion */}
             <div className={styles.entryContent}>
               <h2 className={styles.entryTitle}>{entry.title}</h2>
 

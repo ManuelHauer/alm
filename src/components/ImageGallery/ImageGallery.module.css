@@ -14,6 +14,8 @@
   align-items: center;
   justify-content: center;
   padding: 0;
+  /* Placeholder colour shown while image is loading */
+  background: #efefea;
 }
 
 .image {
