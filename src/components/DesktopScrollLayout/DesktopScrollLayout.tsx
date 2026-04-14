@@ -28,6 +28,7 @@ import styles from './DesktopScrollLayout.module.css'
 
 type Props = {
   entries: EntryDetail[]
+  initialSlug?: string
   showBack?: boolean
 }
 
@@ -38,8 +39,14 @@ const CAROUSEL_RESET_DELAY = 330
 // iOS-style easing: gentle acceleration in, fast mid, gentle deceleration out
 const CAROUSEL_EASING = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
 
-export default function DesktopScrollLayout({ entries, showBack = false }: Props) {
-  const [focusedId, setFocusedId] = useState<number>(entries[0]?.id ?? 0)
+export default function DesktopScrollLayout({ entries, initialSlug, showBack = false }: Props) {
+  const [focusedId, setFocusedId] = useState<number>(() => {
+    if (initialSlug) {
+      const match = entries.find((e) => e.slug === initialSlug)
+      if (match) return match.id
+    }
+    return entries[0]?.id ?? 0
+  })
   const [imageIndex, setImageIndex] = useState(0)
   const [dragOffset, setDragOffset] = useState(0)
   // commitDir drives the commit animation using CSS % (not pixels) so slots
@@ -348,7 +355,13 @@ export default function DesktopScrollLayout({ entries, showBack = false }: Props
         {/* Centered image stack — number above, carousel, title below */}
         <div className={styles.imageOuter}>
           {focusedImages.length === 0 ? (
-            <div className={styles.imageEmpty} />
+            <div className={styles.imageEmpty}>
+              <span className={styles.imageEmptyNumber}>{entryNumberStr}</span>
+              <span className={styles.imageEmptyTitle}>{focusedEntry?.title}</span>
+              {focusedEntry?.plainDescription && (
+                <span className={styles.imageEmptyDesc}>{focusedEntry.plainDescription}</span>
+              )}
+            </div>
           ) : (
             /* imageStack shares the computed image width so number/title
                align with the image edges rather than the full column. */

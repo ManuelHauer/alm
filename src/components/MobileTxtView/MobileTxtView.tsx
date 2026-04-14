@@ -49,7 +49,7 @@ type Props = {
   onSelectEntry: (entry: EntryDetail) => void
 }
 
-const FOCUS_LINE_RATIO = 0.3 // 30% from top of container
+const FOCUS_LINE_RATIO = 0.5 // 50% — vertical centre of container
 const COPIES = 3
 
 const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtView({

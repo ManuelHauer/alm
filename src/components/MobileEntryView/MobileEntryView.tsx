@@ -183,11 +183,15 @@ export default function MobileEntryView({
               dragOffset={imageDragOffset}
               commitDir={commitDir}
               isTransitioning={isCarouselAnimating}
+              sizeHint="thumbnail"
             />
           </div>
         ) : (
           <div className={styles.textOnly}>
             <span className={styles.textOnlyTitle}>{entry.title}</span>
+            {entry.plainDescription && (
+              <span className={styles.textOnlyDescription}>{entry.plainDescription}</span>
+            )}
           </div>
         )}
 

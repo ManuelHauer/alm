@@ -135,5 +135,5 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
   }
 
   // ── Desktop layout — DesktopScrollLayout is self-contained ─────────
-  return <DesktopScrollLayout entries={entries} showBack={showBack} />
+  return <DesktopScrollLayout entries={entries} initialSlug={initialSlug} showBack={showBack} />
 }

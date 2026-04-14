@@ -20,6 +20,7 @@ type Props = {
   dragOffset: number
   commitDir?: number // -1 | 0 | 1 — drives ±100% CSS commit animation
   isTransitioning: boolean
+  sizeHint?: 'thumbnail' | 'medium' // which responsive size to load; default 'medium'
 }
 
 function wrapIdx(i: number, len: number) {
@@ -32,6 +33,7 @@ export default function ImageGallery({
   dragOffset,
   commitDir = 0,
   isTransitioning,
+  sizeHint = 'medium',
 }: Props) {
   const reducedMotion = useReducedMotion()
 
@@ -60,7 +62,7 @@ export default function ImageGallery({
           {item.image && (
             <img
               className={styles.image}
-              src={item.image.sizes?.medium?.url ?? item.image.url}
+              src={item.image.sizes?.[sizeHint]?.url ?? item.image.sizes?.medium?.url ?? item.image.url}
               alt={item.image.alt}
               draggable={false}
               // Centre slot (current image) loads eagerly; adjacent slots lazy
