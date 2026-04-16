@@ -1,0 +1,135 @@
+/* Scrollable column */
+.root {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  background: #fafaf8;
+  display: flex;
+  flex-direction: column;
+  /* Gap between slots = the "peek" separator line */
+  gap: 72px;
+  padding: 12px 0 24px;
+}
+
+/* ── One slot = one entry card ──────────────────────────────────── */
+
+.slot {
+  flex-shrink: 0;
+  padding: 0 12px;
+  opacity: 0.4;
+  transition: opacity 200ms ease;
+  /* Allow native vertical scroll; intercept only horizontal drags for carousel */
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.slotActive {
+  opacity: 1;
+}
+
+/* ── Entry number — identical to MobileEntryView ────────────────── */
+
+.entryNumber {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--alm-orange, #e85c23);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  margin-bottom: 4px;
+}
+
+/* ── Image wrapper: natural aspect ratio, tall but not full-screen  */
+
+.imageWrap {
+  position: relative;
+  width: 100%;
+  /* Intrinsic height comes from aspect-ratio (set inline).
+     Cap keeps very tall portraits from filling the whole screen —
+     adjacent entries always peek above and below. */
+  max-height: 72dvh;
+  overflow: hidden;
+  background: #efefea;
+}
+
+/* The image fills the wrapper */
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #efefea;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+/* ── Footer: title (left) + dots (right) — identical to MobileEntryView */
+
+.imageFooter {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 5px;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 400;
+  color: #111;
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+  flex: 1;
+  text-align: left;
+}
+
+.dots {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #d0d0ca;
+}
+
+.dotActive {
+  background: var(--alm-orange, #e85c23);
+}
+
+/* ── Text-only: mirrors MobileEntryView .textOnly ───────────────── */
+
+.textOnly {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 40dvh;
+}
+
+.textOnlyTitle {
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: center;
+  color: #111;
+  max-width: 85%;
+}
+
+.textOnlyDescription {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: center;
+  color: #555;
+  max-width: 85%;
+}

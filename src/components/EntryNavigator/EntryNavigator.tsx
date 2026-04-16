@@ -6,18 +6,17 @@
  * Desktop: DesktopScrollLayout (self-contained: NavRail + image col + text col).
  *
  * Mobile: left MobileNavRail + main content area + floating IMG/TXT toggle pill.
- *   - IMG mode: MobileEntryView (single entry, tap zones + swipe gestures)
+ *   - IMG mode: MobileImgStream (continuous looping image scroll stream)
  *   - TXT mode: MobileTxtView (continuous loop stream, scroll-to-activate)
  *   - Modes share `currentEntry`; IMG↔TXT switching preserves the active entry.
- *   - Clicking a TXT entry fires `onSelectEntry` → switches to IMG for that entry.
  *
  * URL sync: history.replaceState(/entry/[slug]) whenever currentEntry changes.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import DesktopScrollLayout from '@/components/DesktopScrollLayout/DesktopScrollLayout'
-import MobileEntryView from '@/components/MobileEntryView/MobileEntryView'
+import MobileImgStream from '@/components/MobileImgStream/MobileImgStream'
 import MobileNavRail from '@/components/MobileNavRail/MobileNavRail'
 import MobileTxtView from '@/components/MobileTxtView/MobileTxtView'
 import type { EntryDetail } from '@/types/entry'
@@ -30,10 +29,6 @@ type Props = {
   showBack?: boolean
 }
 
-function wrapIdx(i: number, len: number) {
-  return ((i % len) + len) % len
-}
-
 export default function EntryNavigator({ entries, initialSlug, showBack = false }: Props) {
   const [isMobile, setIsMobile] = useState(false)
   const [imgTxtView, setImgTxtView] = useState<'img' | 'txt'>('img')
@@ -41,6 +36,10 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
   const [currentEntry, setCurrentEntry] = useState<EntryDetail>(
     () => (initialSlug ? (entries.find((e) => e.slug === initialSlug) ?? entries[0]) : entries[0]),
   )
+
+  // Keep a ref so setActiveEntry's identity never changes
+  const currentEntryRef = useRef(currentEntry)
+  currentEntryRef.current = currentEntry
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)')
@@ -50,54 +49,14 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
     return () => mq.removeEventListener('change', handler)
   }, [])
 
-  const setActiveEntry = (entry: EntryDetail) => {
-    if (entry.id === currentEntry.id) return
+  const setActiveEntry = useCallback((entry: EntryDetail) => {
+    if (entry.id === currentEntryRef.current.id) return
     setCurrentEntry(entry)
     history.replaceState(null, '', `/entry/${entry.slug}`)
-  }
-
-  const goPrevEntry = () => {
-    const i = entries.findIndex((e) => e.id === currentEntry.id)
-    setActiveEntry(entries[wrapIdx(i - 1, entries.length)])
-  }
-
-  const goNextEntry = () => {
-    const i = entries.findIndex((e) => e.id === currentEntry.id)
-    setActiveEntry(entries[wrapIdx(i + 1, entries.length)])
-  }
-
-  // Preload adjacent entries' first images so they're in cache when navigated to.
-  const preloadedRef = useRef<Set<string>>(new Set())
-  useEffect(() => {
-    const i = entries.findIndex((e) => e.id === currentEntry.id)
-    const neighbours = [
-      entries[wrapIdx(i - 1, entries.length)],
-      entries[wrapIdx(i + 1, entries.length)],
-    ]
-    for (const neighbour of neighbours) {
-      const img = neighbour?.images[0]?.image
-      if (!img) continue
-      // Prefer thumbnail on mobile (sizeHint), fall back to medium then original
-      const url = img.sizes?.thumbnail?.url ?? img.sizes?.medium?.url ?? img.url
-      if (!url || preloadedRef.current.has(url)) continue
-      preloadedRef.current.add(url)
-      const el = new window.Image()
-      el.src = url
-    }
-  }, [currentEntry, entries])
-
-  // Tap on a TXT entry → make it current AND switch to IMG mode.
-  const selectAndSwitchToImg = (entry: EntryDetail) => {
-    setCurrentEntry(entry)
-    history.replaceState(null, '', `/entry/${entry.slug}`)
-    setImgTxtView('img')
-  }
+  }, [])
 
   // Empty database — nothing to render yet
   if (!currentEntry) return null
-
-  const hasImages = currentEntry.images.length > 0
-  const canToggle = hasImages || imgTxtView === 'txt'
 
   const handleToggle = () => {
     setImgTxtView((v) => (v === 'img' ? 'txt' : 'img'))
@@ -111,19 +70,28 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
 
         <div className={styles.mobileMain} role="region" aria-label="Entry viewer">
           {imgTxtView === 'img' ? (
-            <MobileEntryView
-              entry={currentEntry}
-              onPrevEntry={goPrevEntry}
-              onNextEntry={goNextEntry}
-              onSwitchToTxt={() => setImgTxtView('txt')}
-              showBack={showBack}
+            <MobileImgStream
+              entries={entries}
+              activeEntryId={currentEntry.id}
+              onActivate={setActiveEntry}
+              onSelectEntry={(entry) => {
+                // Tap on image in stream → open that entry's TXT view
+                setCurrentEntry(entry)
+                history.replaceState(null, '', `/entry/${entry.slug}`)
+                setImgTxtView('txt')
+              }}
             />
           ) : (
             <MobileTxtView
               entries={entries}
               activeEntryId={currentEntry.id}
               onActivate={setActiveEntry}
-              onSelectEntry={selectAndSwitchToImg}
+              onSelectEntry={(entry) => {
+                // Tap on TXT entry → switch back to IMG stream for that entry
+                setCurrentEntry(entry)
+                history.replaceState(null, '', `/entry/${entry.slug}`)
+                setImgTxtView('img')
+              }}
             />
           )}
         </div>
@@ -137,9 +105,8 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
         {/* Floating IMG/TXT toggle — fixed bottom-right */}
         <button
           type="button"
-          className={`${styles.floatingToggle} ${!canToggle ? styles.toggleDisabled : ''}`}
+          className={styles.floatingToggle}
           onClick={handleToggle}
-          disabled={!canToggle}
           aria-label={`Switch to ${imgTxtView === 'img' ? 'text' : 'image'} view`}
         >
           <span
