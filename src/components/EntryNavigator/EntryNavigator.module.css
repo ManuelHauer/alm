@@ -92,7 +92,7 @@
 
 /* IMG / TXT labels — outside the pill track */
 .pillOption {
-  font-family: 'Vialog', sans-serif;
+  font-family: var(--font-sans, 'Vialog LT', sans-serif);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.04em;

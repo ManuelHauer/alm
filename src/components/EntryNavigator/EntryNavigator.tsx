@@ -30,7 +30,8 @@ type Props = {
 }
 
 export default function EntryNavigator({ entries, initialSlug, showBack = false }: Props) {
-  const [isMobile, setIsMobile] = useState(false)
+  // null = not yet measured (SSR / first paint). Prevents desktop flash on mobile.
+  const [isMobile, setIsMobile] = useState<boolean | null>(null)
   const [imgTxtView, setImgTxtView] = useState<'img' | 'txt'>('img')
 
   const [currentEntry, setCurrentEntry] = useState<EntryDetail>(
@@ -57,6 +58,9 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
 
   // Empty database — nothing to render yet
   if (!currentEntry) return null
+
+  // Wait for viewport measurement before rendering (prevents desktop flash on mobile)
+  if (isMobile === null) return null
 
   const handleToggle = () => {
     setImgTxtView((v) => (v === 'img' ? 'txt' : 'img'))

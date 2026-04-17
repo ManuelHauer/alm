@@ -156,7 +156,8 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
     const cRect = container.getBoundingClientRect()
     const elRect = el.getBoundingClientRect()
     const offsetInContainer = elRect.top - cRect.top + container.scrollTop
-    container.scrollTop = offsetInContainer - cRect.height * FOCUS_LINE_RATIO
+    // Center the entry vertically: entry midpoint at container midpoint
+    container.scrollTop = offsetInContainer + elRect.height / 2 - cRect.height / 2
 
     hasInitialScrolled.current = true
 

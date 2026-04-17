@@ -29,7 +29,8 @@
 }
 
 .logoImg {
-  width: 100%;
+  width: calc(100% + 2px);
+  margin: -1px;
   height: auto;
   display: block;
 }

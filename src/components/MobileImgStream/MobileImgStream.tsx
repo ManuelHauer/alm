@@ -261,8 +261,9 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
 
     const cRect = container.getBoundingClientRect()
     const elRect = el.getBoundingClientRect()
+    // Center the entry vertically: entry midpoint at container midpoint
     container.scrollTop =
-      elRect.top - cRect.top + container.scrollTop - cRect.height * FOCUS_LINE_RATIO
+      elRect.top - cRect.top + container.scrollTop + elRect.height / 2 - cRect.height / 2
     hasInitialScrolled.current = true
 
     programmaticScrollTimerRef.current = setTimeout(() => {
