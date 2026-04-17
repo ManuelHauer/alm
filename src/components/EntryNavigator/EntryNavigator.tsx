@@ -113,8 +113,8 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
             className={`${styles.pill} ${imgTxtView === 'img' ? styles.pillImg : styles.pillTxt}`}
           >
             <span className={styles.pillOption}>IMG</span>
-            <span className={styles.pillOption}>TXT</span>
             <span className={styles.pillIndicator} />
+            <span className={styles.pillOption}>TXT</span>
           </span>
         </button>
       </div>
