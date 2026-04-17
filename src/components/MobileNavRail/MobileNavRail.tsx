@@ -9,10 +9,10 @@ import styles from './MobileNavRail.module.css'
  *   ┌──────┐
  *   │ alm  │ ← white text on grey block (top)
  *   │      │
- *   │      │
+ *   │ ALM  │
+ *   │ STU  │ ← vertical text stack (centred)
+ *   │ SHP  │
  *   │ INS  │
- *   │ SHP  │ ← vertical text stack (bottom)
- *   │ STU  │
  *   └──────┘
  *
  * Uses vertical-rl writing mode + 180deg rotation so labels read
@@ -31,6 +31,9 @@ export default function MobileNavRail({ desktop = false }: Props) {
       </Link>
 
       <nav className={styles.links} aria-label="Primary">
+        <a href="/" className={styles.link}>
+          ALMANAC
+        </a>
         <a href="/studio" className={styles.link}>
           STUDIO
         </a>
