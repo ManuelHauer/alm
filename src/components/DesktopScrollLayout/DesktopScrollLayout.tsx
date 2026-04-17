@@ -308,9 +308,14 @@ export default function DesktopScrollLayout({ entries, initialSlug, showBack = f
   }, [])
 
   const handleDividerPointerUp = useCallback(() => {
-    // Small delay before re-enabling scroll detection so MobileTxtView's
-    // scroll offsets have time to settle after the column resize finishes.
-    setTimeout(() => { isDividerDragging.current = false }, 150)
+    // After divider drag ends, recompute MobileTxtView's cached scroll
+    // offsets (they became stale during the resize) before re-enabling
+    // scroll-driven focus detection.
+    requestAnimationFrame(() => {
+      txtViewRef.current?.recomputeOffsets()
+      // Re-enable detection after a frame so the fresh offsets are used
+      setTimeout(() => { isDividerDragging.current = false }, 50)
+    })
   }, [])
 
   const slotTransition = isTransitioning ? `transform ${CAROUSEL_ANIM_MS}ms ${CAROUSEL_EASING}` : 'none'

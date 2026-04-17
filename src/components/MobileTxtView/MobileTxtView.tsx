@@ -27,6 +27,8 @@ import styles from './MobileTxtView.module.css'
 export type MobileTxtViewHandle = {
   /** Smoothly scroll the text column to show the entry with the given id. */
   scrollToEntry: (id: number) => void
+  /** Recompute cached scroll offsets (call after container resize). */
+  recomputeOffsets: () => void
 }
 
 type Props = {
@@ -77,7 +79,7 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
   const middleStartRef = useRef(0)
   const middleHeightRef = useRef(0)
 
-  // Expose scrollToEntry to parent (DesktopScrollLayout keyboard nav)
+  // Expose scrollToEntry + recomputeOffsets to parent (DesktopScrollLayout)
   useImperativeHandle(ref, () => ({
     scrollToEntry: (id: number) => {
       const container = scrollRef.current
@@ -100,6 +102,7 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
         behavior: 'smooth',
       })
     },
+    recomputeOffsets: computeScrollOffsets,
   }))
 
   // Looped list: 3 copies — [0=pre-clone | 1=real | 2=post-clone]
