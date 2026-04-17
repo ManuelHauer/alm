@@ -130,7 +130,12 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
     return () => window.removeEventListener('resize', computeScrollOffsets)
   }, [computeScrollOffsets])
 
+  const isProgrammaticScrollRef = useRef(false)
+  const programmaticScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Initial scroll: jump instantly to active entry in the middle set.
+  // Suppress scroll detection while the jump settles so we don't
+  // accidentally activate a neighbouring entry.
   useLayoutEffect(() => {
     if (hasInitialScrolled.current) return
     const container = scrollRef.current
@@ -139,17 +144,23 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
     const el = entryRefs.current.get(`${activeEntryId}-1`)
     if (!el) return
 
+    isProgrammaticScrollRef.current = true
+    if (programmaticScrollTimerRef.current !== null)
+      clearTimeout(programmaticScrollTimerRef.current)
+
     const cRect = container.getBoundingClientRect()
     const elRect = el.getBoundingClientRect()
     const offsetInContainer = elRect.top - cRect.top + container.scrollTop
     container.scrollTop = offsetInContainer - cRect.height * FOCUS_LINE_RATIO
 
     hasInitialScrolled.current = true
+
+    // Allow detection after the browser has painted the new position
+    programmaticScrollTimerRef.current = setTimeout(() => {
+      isProgrammaticScrollRef.current = false
+    }, 300)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // mount only — no dep on activeEntryId, intentional
-
-  const isProgrammaticScrollRef = useRef(false)
-  const programmaticScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isTeleportingRef = useRef(false)
   // RAF handle for throttling detection to one frame per scroll burst
   const detectRafRef = useRef<number | null>(null)

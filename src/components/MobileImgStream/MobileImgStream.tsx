@@ -237,17 +237,31 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
     return () => window.removeEventListener('resize', computeScrollOffsets)
   }, [computeScrollOffsets])
 
+  const isProgrammaticScrollRef = useRef(false)
+  const programmaticScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Initial scroll: jump instantly to active entry in the middle set.
+  // Suppress scroll detection while the jump settles.
   useLayoutEffect(() => {
     if (hasInitialScrolled.current) return
     const container = scrollRef.current
     if (!container) return
     const el = slotRefs.current.get(`${activeEntryId}-1`)
     if (!el) return
+
+    isProgrammaticScrollRef.current = true
+    if (programmaticScrollTimerRef.current !== null)
+      clearTimeout(programmaticScrollTimerRef.current)
+
     const cRect = container.getBoundingClientRect()
     const elRect = el.getBoundingClientRect()
     container.scrollTop =
       elRect.top - cRect.top + container.scrollTop - cRect.height * FOCUS_LINE_RATIO
     hasInitialScrolled.current = true
+
+    programmaticScrollTimerRef.current = setTimeout(() => {
+      isProgrammaticScrollRef.current = false
+    }, 300)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -287,6 +301,7 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
       }
 
       if (isTeleportingRef.current) return
+      if (isProgrammaticScrollRef.current) return
 
       if (detectRafRef.current !== null) return
       detectRafRef.current = requestAnimationFrame(() => {
