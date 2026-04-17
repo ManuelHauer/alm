@@ -46,8 +46,8 @@ type Props = {
 
 // ─── Per-slot carousel ────────────────────────────────────────────────────────
 
-const AXIS_LOCK_PX = 10
-const SWIPE_COMMIT_PX = 50
+const AXIS_LOCK_PX = 6
+const SWIPE_COMMIT_PX = 40
 const CAROUSEL_RESET_DELAY = 330
 
 function wrapIdx(i: number, len: number) {
@@ -117,7 +117,9 @@ function Slot({ entry, isActive, nearViewport, slotRef, onSelectEntry }: SlotPro
 
       if (lockedAxis.current === null) {
         if (Math.abs(mx) > AXIS_LOCK_PX || Math.abs(my) > AXIS_LOCK_PX) {
-          lockedAxis.current = Math.abs(mx) >= Math.abs(my) ? 'h' : 'v'
+          // Bias toward horizontal: treat anything within ~35° of horizontal
+          // as a carousel swipe (h wins if mx >= 0.6 * my)
+          lockedAxis.current = Math.abs(mx) >= Math.abs(my) * 0.6 ? 'h' : 'v'
         }
       }
 

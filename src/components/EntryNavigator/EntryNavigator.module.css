@@ -67,12 +67,17 @@
 
 .floatingToggle {
   position: fixed;
-  bottom: 18px;
-  right: 18px;
+  bottom: 0;
+  right: 0;
   z-index: 200;
-  background: none;
+  background: linear-gradient(
+    to top left,
+    rgba(250, 250, 248, 0.95) 0%,
+    rgba(250, 250, 248, 0.55) 45%,
+    transparent 100%
+  );
   border: none;
-  padding: 0;
+  padding: 0 18px 18px 24px;
   cursor: pointer;
 }
 

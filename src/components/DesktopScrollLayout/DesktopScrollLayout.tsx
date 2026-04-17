@@ -308,7 +308,9 @@ export default function DesktopScrollLayout({ entries, initialSlug, showBack = f
   }, [])
 
   const handleDividerPointerUp = useCallback(() => {
-    isDividerDragging.current = false
+    // Small delay before re-enabling scroll detection so MobileTxtView's
+    // scroll offsets have time to settle after the column resize finishes.
+    setTimeout(() => { isDividerDragging.current = false }, 150)
   }, [])
 
   const slotTransition = isTransitioning ? `transform ${CAROUSEL_ANIM_MS}ms ${CAROUSEL_EASING}` : 'none'
@@ -468,6 +470,9 @@ export default function DesktopScrollLayout({ entries, initialSlug, showBack = f
           entries={entries}
           activeEntryId={focusedId}
           onActivate={(entry) => {
+            // Ignore scroll-driven focus changes while the divider is being
+            // dragged — the text column is resizing and offsets are stale.
+            if (isDividerDragging.current) return
             focusSourceRef.current = 'scroll'
             setFocusedId(entry.id)
           }}
