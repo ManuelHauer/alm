@@ -57,11 +57,12 @@ function wrapIdx(i: number, len: number) {
 type SlotProps = {
   entry: EntryDetail
   isActive: boolean
+  nearViewport: boolean
   slotRef: (el: HTMLDivElement | null) => void
   onSelectEntry: (entry: EntryDetail) => void
 }
 
-function Slot({ entry, isActive, slotRef, onSelectEntry }: SlotProps) {
+function Slot({ entry, isActive, nearViewport, slotRef, onSelectEntry }: SlotProps) {
   const hasImages = entry.images.length > 0
   const hasMultipleImages = entry.images.length > 1
   const [imageIndex, setImageIndex] = useState(0)
@@ -152,14 +153,16 @@ function Slot({ entry, isActive, slotRef, onSelectEntry }: SlotProps) {
             className={styles.imageWrap}
             style={aspectRatio ? { aspectRatio: String(aspectRatio) } : undefined}
           >
-            <ImageGallery
-              images={entry.images}
-              currentIndex={imageIndex}
-              dragOffset={imageDragOffset}
-              commitDir={commitDir}
-              isTransitioning={isCarouselAnimating}
-              sizeHint="medium"
-            />
+            {nearViewport ? (
+              <ImageGallery
+                images={entry.images}
+                currentIndex={imageIndex}
+                dragOffset={imageDragOffset}
+                commitDir={commitDir}
+                isTransitioning={isCarouselAnimating}
+                sizeHint="thumbnail"
+              />
+            ) : null}
           </div>
 
           <div className={styles.imageFooter}>
@@ -200,6 +203,9 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
   const scrollRef = useRef<HTMLDivElement>(null)
   const slotRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const hasInitialScrolled = useRef(false)
+
+  const activeEntryIdRef = useRef(activeEntryId)
+  activeEntryIdRef.current = activeEntryId
 
   const entryScrollOffsetsRef = useRef<Map<number, number>>(new Map())
   const middleStartRef = useRef(0)
@@ -318,7 +324,7 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
           }
         }
 
-        if (bestId !== null && bestId !== activeEntryId) {
+        if (bestId !== null && bestId !== activeEntryIdRef.current) {
           const entry = entries.find((e) => e.id === bestId)
           if (entry) {
             onActivate(entry)
@@ -336,7 +342,39 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
         detectRafRef.current = null
       }
     }
-  }, [entries, activeEntryId, onActivate])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, onActivate])
+
+  // ── Viewport-aware rendering: only mount images for nearby slots ──
+  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set())
+  const observerRef = useRef<IntersectionObserver | null>(null)
+
+  useEffect(() => {
+    const container = scrollRef.current
+    if (!container) return
+
+    observerRef.current = new IntersectionObserver(
+      (ioEntries) => {
+        setVisibleKeys((prev) => {
+          const next = new Set(prev)
+          for (const ioe of ioEntries) {
+            const key = (ioe.target as HTMLElement).dataset.slotKey
+            if (!key) continue
+            if (ioe.isIntersecting) next.add(key)
+            else next.delete(key)
+          }
+          return next
+        })
+      },
+      { root: container, rootMargin: '200% 0px' },
+    )
+
+    for (const el of slotRefs.current.values()) {
+      observerRef.current.observe(el)
+    }
+
+    return () => { observerRef.current?.disconnect() }
+  }, [entries])
 
   const loopedEntries = Array.from({ length: COPIES }).flatMap((_, copy) =>
     entries.map((e) => ({ entry: e, copy })),
@@ -351,9 +389,17 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
             key={key}
             entry={entry}
             isActive={entry.id === activeEntryId}
+            nearViewport={visibleKeys.has(key)}
             slotRef={(el) => {
-              if (el) slotRefs.current.set(key, el)
-              else slotRefs.current.delete(key)
+              if (el) {
+                slotRefs.current.set(key, el)
+                el.dataset.slotKey = key
+                observerRef.current?.observe(el)
+              } else {
+                const prev = slotRefs.current.get(key)
+                if (prev) observerRef.current?.unobserve(prev)
+                slotRefs.current.delete(key)
+              }
             }}
             onSelectEntry={onSelectEntry}
           />

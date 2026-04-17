@@ -50,6 +50,11 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
   const entryRefs = useRef<Map<string, HTMLElement>>(new Map())
   const hasInitialScrolled = useRef(false)
 
+  // Ref mirrors activeEntryId so the scroll listener can read it
+  // without being in the useEffect dep array (avoids re-subscribe on every change).
+  const activeEntryIdRef = useRef(activeEntryId)
+  activeEntryIdRef.current = activeEntryId
+
   // ── Pre-computed scroll offsets (middle-set, relative to container origin) ──
   // Avoids getBoundingClientRect() in the scroll hot path.
   // offset = position from the top of the scrollable content (stable, not viewport-relative).
@@ -209,7 +214,7 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
           }
         }
 
-        if (bestId !== null && bestId !== activeEntryId) {
+        if (bestId !== null && bestId !== activeEntryIdRef.current) {
           const bestEntry = entries.find((e) => e.id === bestId)
           if (bestEntry) {
             onActivate(bestEntry)
@@ -231,7 +236,8 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
         detectRafRef.current = null
       }
     }
-  }, [entries, activeEntryId, onActivate])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, onActivate])
 
   return (
     <div ref={scrollRef} className={styles.root}>
