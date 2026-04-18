@@ -14,12 +14,21 @@
  *   (axis-locked; vertical drag falls through to native scroll).
  * Tap: calls onSelectEntry so the parent can open the full single-entry view.
  *
- * Looping + active-entry detection: identical to MobileTxtView.
+ * Looping: single-copy list. When the user scrolls past the last entry (or
+ * before the first), scrollTop teleports to the opposite end. With 200+
+ * entries the list is long enough that the seam is rarely hit.
+ *
+ * Performance:
+ *   - Slot is React.memo'd — only re-renders on own-prop changes.
+ *   - onActivate is throttled to ≤1 call per 150ms (prevents parent re-render flood).
+ *   - history.replaceState is throttled to ≤1 call per 300ms (prevents iOS Safari crash).
+ *   - IntersectionObserver controls image mount/unmount (nearViewport).
  */
 
 import { useDrag } from '@use-gesture/react'
 import {
   forwardRef,
+  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -63,7 +72,14 @@ type SlotProps = {
   scrollContainer: React.RefObject<HTMLDivElement | null>
 }
 
-function Slot({ entry, isActive, nearViewport, slotRef, onSelectEntry, scrollContainer }: SlotProps) {
+const Slot = memo(function Slot({
+  entry,
+  isActive,
+  nearViewport,
+  slotRef,
+  onSelectEntry,
+  scrollContainer,
+}: SlotProps) {
   const hasImages = entry.images.length > 0
   const hasMultipleImages = entry.images.length > 1
   const [imageIndex, setImageIndex] = useState(0)
@@ -74,8 +90,7 @@ function Slot({ entry, isActive, nearViewport, slotRef, onSelectEntry, scrollCon
   const lockedAxis = useRef<'h' | 'v' | null>(null)
   const prevMy = useRef(0)
 
-  // Reset carousel when entry changes (shouldn't happen since these are fixed
-  // slots, but safety net for future)
+  // Reset carousel when entry changes
   useEffect(() => {
     setImageIndex(0)
     setImageDragOffset(0)
@@ -122,8 +137,6 @@ function Slot({ entry, isActive, nearViewport, slotRef, onSelectEntry, scrollCon
 
       if (lockedAxis.current === null) {
         if (Math.abs(mx) > AXIS_LOCK_PX || Math.abs(my) > AXIS_LOCK_PX) {
-          // Bias toward horizontal: treat anything within ~35° of horizontal
-          // as a carousel swipe (h wins if mx >= 0.6 * my)
           lockedAxis.current = Math.abs(mx) >= Math.abs(my) * 0.6 ? 'h' : 'v'
         }
       }
@@ -134,8 +147,6 @@ function Slot({ entry, isActive, nearViewport, slotRef, onSelectEntry, scrollCon
         else if (Math.abs(mx) > SWIPE_COMMIT_PX) commitSwipe(mx < 0 ? 1 : -1)
         else snapBack()
       } else if (lockedAxis.current === 'v' && hasMultipleImages) {
-        // Manual vertical scroll for multi-image slots (touch-action: none
-        // on imageWrap prevents native scroll, so we forward it here)
         const delta = my - prevMy.current
         prevMy.current = my
         scrollContainer.current?.scrollBy(0, -delta)
@@ -201,12 +212,15 @@ function Slot({ entry, isActive, nearViewport, slotRef, onSelectEntry, scrollCon
       )}
     </div>
   )
-}
+})
 
 // ─── Scroll stream ────────────────────────────────────────────────────────────
 
 const FOCUS_LINE_RATIO = 0.5
-const COPIES = 3
+// How close (in px) the user must scroll to the top/bottom edge before we
+// teleport to the opposite end. Large enough to trigger before the browser
+// shows overscroll but small enough to be invisible at normal scroll speed.
+const TELEPORT_THRESHOLD_PX = 200
 
 const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function MobileImgStream(
   { entries, activeEntryId, onActivate, onSelectEntry },
@@ -219,9 +233,8 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
   const activeEntryIdRef = useRef(activeEntryId)
   activeEntryIdRef.current = activeEntryId
 
+  // Pre-computed scroll offsets for active-entry detection (hot path).
   const entryScrollOffsetsRef = useRef<Map<number, number>>(new Map())
-  const middleStartRef = useRef(0)
-  const middleHeightRef = useRef(0)
 
   const computeScrollOffsets = useCallback(() => {
     const container = scrollRef.current
@@ -229,7 +242,7 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
     const cTop = container.getBoundingClientRect().top
     const map = new Map<number, number>()
     for (const entry of entries) {
-      const el = slotRefs.current.get(`${entry.id}-1`)
+      const el = slotRefs.current.get(String(entry.id))
       if (!el) continue
       map.set(entry.id, el.getBoundingClientRect().top - cTop + container.scrollTop)
     }
@@ -237,16 +250,6 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
   }, [entries])
 
   useLayoutEffect(() => {
-    const container = scrollRef.current
-    if (!container) return
-    const firstMiddle = slotRefs.current.get(`${entries[0].id}-1`)
-    const firstPost = slotRefs.current.get(`${entries[0].id}-2`)
-    if (!firstMiddle || !firstPost) return
-    const cTop = container.getBoundingClientRect().top
-    middleStartRef.current =
-      firstMiddle.getBoundingClientRect().top - cTop + container.scrollTop
-    middleHeightRef.current =
-      firstPost.getBoundingClientRect().top - cTop + container.scrollTop - middleStartRef.current
     computeScrollOffsets()
   }, [entries, computeScrollOffsets])
 
@@ -258,13 +261,12 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
   const isProgrammaticScrollRef = useRef(false)
   const programmaticScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Initial scroll: jump instantly to active entry in the middle set.
-  // Suppress scroll detection while the jump settles.
+  // Initial scroll: jump instantly to active entry.
   useLayoutEffect(() => {
     if (hasInitialScrolled.current) return
     const container = scrollRef.current
     if (!container) return
-    const el = slotRefs.current.get(`${activeEntryId}-1`)
+    const el = slotRefs.current.get(String(activeEntryId))
     if (!el) return
 
     isProgrammaticScrollRef.current = true
@@ -273,7 +275,6 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
 
     const cRect = container.getBoundingClientRect()
     const elRect = el.getBoundingClientRect()
-    // Center the entry vertically: entry midpoint at container midpoint
     container.scrollTop =
       elRect.top - cRect.top + container.scrollTop + elRect.height / 2 - cRect.height / 2
     hasInitialScrolled.current = true
@@ -288,7 +289,7 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
     scrollToEntry: (id: number) => {
       const container = scrollRef.current
       if (!container) return
-      const el = slotRefs.current.get(`${id}-1`)
+      const el = slotRefs.current.get(String(id))
       if (!el) return
       const cRect = container.getBoundingClientRect()
       const elRect = el.getBoundingClientRect()
@@ -299,6 +300,43 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
     },
   }))
 
+  // ── Throttled onActivate — max 1 call per 150ms ─────────────────────────────
+  const activateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingActivateRef = useRef<EntryDetail | null>(null)
+
+  const throttledActivate = useCallback(
+    (entry: EntryDetail) => {
+      pendingActivateRef.current = entry
+      if (activateTimerRef.current !== null) return // already scheduled
+      activateTimerRef.current = setTimeout(() => {
+        activateTimerRef.current = null
+        const pending = pendingActivateRef.current
+        if (pending && pending.id !== activeEntryIdRef.current) {
+          onActivate(pending)
+        }
+        pendingActivateRef.current = null
+      }, 150)
+    },
+    [onActivate],
+  )
+
+  // ── Throttled history.replaceState — max 1 call per 300ms ───────────────────
+  const historyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSlugRef = useRef<string | null>(null)
+
+  const throttledReplaceState = useCallback((slug: string) => {
+    pendingSlugRef.current = slug
+    if (historyTimerRef.current !== null) return
+    historyTimerRef.current = setTimeout(() => {
+      historyTimerRef.current = null
+      const slug = pendingSlugRef.current
+      if (slug) {
+        try { window.history.replaceState(null, '', `/entry/${slug}`) } catch { /* ignore */ }
+      }
+      pendingSlugRef.current = null
+    }, 300)
+  }, [])
+
   const isTeleportingRef = useRef(false)
   const detectRafRef = useRef<number | null>(null)
 
@@ -307,13 +345,24 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
     if (!container) return
 
     const onScroll = () => {
-      const middleStart = middleStartRef.current
-      const middleHeight = middleHeightRef.current
-      if (middleHeight > 0) {
-        const st = container.scrollTop
-        if (st < middleStart || st >= middleStart + middleHeight) {
+      // ── Edge teleport: jump to opposite end when near top/bottom ──
+      const st = container.scrollTop
+      const maxScroll = container.scrollHeight - container.clientHeight
+
+      if (maxScroll > 0 && !isTeleportingRef.current) {
+        if (st <= TELEPORT_THRESHOLD_PX) {
+          // Near top → jump to corresponding position near bottom.
+          // We want the same entry visible, so offset from the bottom by the
+          // same distance the current position is from the top of the list.
           isTeleportingRef.current = true
-          container.scrollTop = st < middleStart ? st + middleHeight : st - middleHeight
+          container.scrollTop = maxScroll - TELEPORT_THRESHOLD_PX + st
+          requestAnimationFrame(() => { isTeleportingRef.current = false })
+          return
+        }
+        if (st >= maxScroll - TELEPORT_THRESHOLD_PX) {
+          // Near bottom → jump to corresponding position near top.
+          isTeleportingRef.current = true
+          container.scrollTop = TELEPORT_THRESHOLD_PX - (maxScroll - st)
           requestAnimationFrame(() => { isTeleportingRef.current = false })
           return
         }
@@ -322,6 +371,7 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
       if (isTeleportingRef.current) return
       if (isProgrammaticScrollRef.current) return
 
+      // ── Active entry detection — throttled to one RAF per scroll burst ──
       if (detectRafRef.current !== null) return
       detectRafRef.current = requestAnimationFrame(() => {
         detectRafRef.current = null
@@ -340,8 +390,8 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
         if (bestId !== null && bestId !== activeEntryIdRef.current) {
           const entry = entries.find((e) => e.id === bestId)
           if (entry) {
-            onActivate(entry)
-            try { window.history.replaceState(null, '', `/entry/${entry.slug}`) } catch { /* ignore */ }
+            throttledActivate(entry)
+            throttledReplaceState(entry.slug)
           }
         }
       })
@@ -356,7 +406,7 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, onActivate])
+  }, [entries, throttledActivate, throttledReplaceState])
 
   // ── Viewport-aware rendering: only mount images for nearby slots ──
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set())
@@ -389,14 +439,10 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
     return () => { observerRef.current?.disconnect() }
   }, [entries])
 
-  const loopedEntries = Array.from({ length: COPIES }).flatMap((_, copy) =>
-    entries.map((e) => ({ entry: e, copy })),
-  )
-
   return (
     <div ref={scrollRef} className={styles.root}>
-      {loopedEntries.map(({ entry, copy }) => {
-        const key = `${entry.id}-${copy}`
+      {entries.map((entry) => {
+        const key = String(entry.id)
         return (
           <Slot
             key={key}

@@ -3,19 +3,15 @@
 /**
  * MobileTxtView — TXT mode: continuous looping vertical stream of all entries.
  *
- * Looping strategy:
- *   Renders entries 3× [clone | real | clone].
- *   On mount: instant-jump scrollTop to put the active entry in the middle
- *   set at the 50% focus line (vertical centre).
- *   On scroll: when scrollTop exits the middle set's bounds, teleport
- *   ± middleSetHeight (no animation). Content at old/new position is
- *   identical, so no visual jump.
+ * Looping: single-copy list. When the user scrolls past the last entry (or
+ * before the first), scrollTop teleports to the opposite end.
  *
  * Performance:
  *   Entry offsets are pre-computed once after layout and cached.
  *   The scroll handler uses ONLY scrollTop + cached values — zero
  *   getBoundingClientRect() calls in the hot path.
  *   Detection is throttled to one RAF per scroll burst.
+ *   onActivate is throttled to ≤1 per 150ms; replaceState to ≤1 per 300ms.
  */
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
@@ -39,7 +35,7 @@ type Props = {
 }
 
 const FOCUS_LINE_RATIO = 0.5 // 50% — vertical centre of container
-const COPIES = 3
+const TELEPORT_THRESHOLD_PX = 200
 
 const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtView({
   entries,
@@ -48,18 +44,13 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
   onSelectEntry,
 }, ref) {
   const scrollRef = useRef<HTMLDivElement>(null)
-  // Keyed by `${entryId}-${copyIndex}` — we only track copy=1 (middle set).
   const entryRefs = useRef<Map<string, HTMLElement>>(new Map())
   const hasInitialScrolled = useRef(false)
 
-  // Ref mirrors activeEntryId so the scroll listener can read it
-  // without being in the useEffect dep array (avoids re-subscribe on every change).
   const activeEntryIdRef = useRef(activeEntryId)
   activeEntryIdRef.current = activeEntryId
 
-  // ── Pre-computed scroll offsets (middle-set, relative to container origin) ──
-  // Avoids getBoundingClientRect() in the scroll hot path.
-  // offset = position from the top of the scrollable content (stable, not viewport-relative).
+  // ── Pre-computed scroll offsets (relative to container origin) ──
   const entryScrollOffsetsRef = useRef<Map<number, number>>(new Map())
 
   const computeScrollOffsets = useCallback(() => {
@@ -68,29 +59,22 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
     const cTop = container.getBoundingClientRect().top
     const map = new Map<number, number>()
     for (const entry of entries) {
-      const el = entryRefs.current.get(`${entry.id}-1`)
+      const el = entryRefs.current.get(String(entry.id))
       if (!el) continue
       map.set(entry.id, el.getBoundingClientRect().top - cTop + container.scrollTop)
     }
     entryScrollOffsetsRef.current = map
   }, [entries])
 
-  // Store middle-set bounds for loop teleport (also pre-computed).
-  const middleStartRef = useRef(0)
-  const middleHeightRef = useRef(0)
-
   // Expose scrollToEntry + recomputeOffsets to parent (DesktopScrollLayout)
   useImperativeHandle(ref, () => ({
     scrollToEntry: (id: number) => {
       const container = scrollRef.current
-      const el = entryRefs.current.get(`${id}-1`)
+      const el = entryRefs.current.get(String(id))
       if (!container || !el) return
       const cRect = container.getBoundingClientRect()
       const elRect = el.getBoundingClientRect()
       const offsetInContainer = elRect.top - cRect.top + container.scrollTop
-      // Suppress onActivate while smooth scroll plays out (~500ms covers typical
-      // smooth-scroll duration); prevents intermediate entries from overwriting
-      // the intended active entry and causing flicker / "press twice" symptoms.
       isProgrammaticScrollRef.current = true
       if (programmaticScrollTimerRef.current !== null)
         clearTimeout(programmaticScrollTimerRef.current)
@@ -105,34 +89,11 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
     recomputeOffsets: computeScrollOffsets,
   }))
 
-  // Looped list: 3 copies — [0=pre-clone | 1=real | 2=post-clone]
-  const loopedEntries = Array.from({ length: COPIES }).flatMap((_, copy) =>
-    entries.map((e) => ({ entry: e, copy })),
-  )
-
-  // Compute offsets + middle-set bounds after layout, and on resize.
+  // Compute offsets after layout, and on resize.
   useLayoutEffect(() => {
-    const container = scrollRef.current
-    if (!container) return
-
-    // First entry of copy-1 and first entry of copy-2 delimit the middle set.
-    const firstMiddle = entryRefs.current.get(`${entries[0].id}-1`)
-    const firstPost = entryRefs.current.get(`${entries[0].id}-2`)
-    if (!firstMiddle || !firstPost) return
-
-    const cTop = container.getBoundingClientRect().top
-    const middleStart =
-      firstMiddle.getBoundingClientRect().top - cTop + container.scrollTop
-    const middleEnd =
-      firstPost.getBoundingClientRect().top - cTop + container.scrollTop
-
-    middleStartRef.current = middleStart
-    middleHeightRef.current = middleEnd - middleStart
-
     computeScrollOffsets()
   }, [entries, computeScrollOffsets])
 
-  // Re-compute offsets on viewport resize (font scaling, orientation change).
   useEffect(() => {
     window.addEventListener('resize', computeScrollOffsets, { passive: true })
     return () => window.removeEventListener('resize', computeScrollOffsets)
@@ -141,15 +102,13 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
   const isProgrammaticScrollRef = useRef(false)
   const programmaticScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Initial scroll: jump instantly to active entry in the middle set.
-  // Suppress scroll detection while the jump settles so we don't
-  // accidentally activate a neighbouring entry.
+  // Initial scroll: jump instantly to active entry.
   useLayoutEffect(() => {
     if (hasInitialScrolled.current) return
     const container = scrollRef.current
     if (!container) return
 
-    const el = entryRefs.current.get(`${activeEntryId}-1`)
+    const el = entryRefs.current.get(String(activeEntryId))
     if (!el) return
 
     isProgrammaticScrollRef.current = true
@@ -159,38 +118,76 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
     const cRect = container.getBoundingClientRect()
     const elRect = el.getBoundingClientRect()
     const offsetInContainer = elRect.top - cRect.top + container.scrollTop
-    // Center the entry vertically: entry midpoint at container midpoint
     container.scrollTop = offsetInContainer + elRect.height / 2 - cRect.height / 2
 
     hasInitialScrolled.current = true
 
-    // Allow detection after the browser has painted the new position
     programmaticScrollTimerRef.current = setTimeout(() => {
       isProgrammaticScrollRef.current = false
     }, 300)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // mount only — no dep on activeEntryId, intentional
+  }, [])
+
+  // ── Throttled onActivate — max 1 call per 150ms ─────────────────────────────
+  const activateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingActivateRef = useRef<EntryDetail | null>(null)
+
+  const throttledActivate = useCallback(
+    (entry: EntryDetail) => {
+      pendingActivateRef.current = entry
+      if (activateTimerRef.current !== null) return
+      activateTimerRef.current = setTimeout(() => {
+        activateTimerRef.current = null
+        const pending = pendingActivateRef.current
+        if (pending && pending.id !== activeEntryIdRef.current) {
+          onActivate(pending)
+        }
+        pendingActivateRef.current = null
+      }, 150)
+    },
+    [onActivate],
+  )
+
+  // ── Throttled history.replaceState — max 1 call per 300ms ───────────────────
+  const historyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSlugRef = useRef<string | null>(null)
+
+  const throttledReplaceState = useCallback((slug: string) => {
+    pendingSlugRef.current = slug
+    if (historyTimerRef.current !== null) return
+    historyTimerRef.current = setTimeout(() => {
+      historyTimerRef.current = null
+      const slug = pendingSlugRef.current
+      if (slug) {
+        try { window.history.replaceState(null, '', `/entry/${slug}`) } catch { /* ignore */ }
+      }
+      pendingSlugRef.current = null
+    }, 300)
+  }, [])
+
   const isTeleportingRef = useRef(false)
-  // RAF handle for throttling detection to one frame per scroll burst
   const detectRafRef = useRef<number | null>(null)
 
-  // Scroll listener: teleport at boundaries + update active entry.
-  // Hot-path uses ONLY scrollTop + pre-computed values (no getBoundingClientRect).
+  // Scroll listener: teleport at edges + update active entry.
   useEffect(() => {
     const container = scrollRef.current
     if (!container) return
 
     const onScroll = () => {
-      // ── Loop teleport (always immediate, no DOM reads) ──
-      const middleStart = middleStartRef.current
-      const middleHeight = middleHeightRef.current
-      if (middleHeight > 0) {
-        const st = container.scrollTop
-        if (st < middleStart || st >= middleStart + middleHeight) {
+      // ── Edge teleport ──
+      const st = container.scrollTop
+      const maxScroll = container.scrollHeight - container.clientHeight
+
+      if (maxScroll > 0 && !isTeleportingRef.current) {
+        if (st <= TELEPORT_THRESHOLD_PX) {
           isTeleportingRef.current = true
-          container.scrollTop = st < middleStart
-            ? st + middleHeight
-            : st - middleHeight
+          container.scrollTop = maxScroll - TELEPORT_THRESHOLD_PX + st
+          requestAnimationFrame(() => { isTeleportingRef.current = false })
+          return
+        }
+        if (st >= maxScroll - TELEPORT_THRESHOLD_PX) {
+          isTeleportingRef.current = true
+          container.scrollTop = TELEPORT_THRESHOLD_PX - (maxScroll - st)
           requestAnimationFrame(() => { isTeleportingRef.current = false })
           return
         }
@@ -221,12 +218,8 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
         if (bestId !== null && bestId !== activeEntryIdRef.current) {
           const bestEntry = entries.find((e) => e.id === bestId)
           if (bestEntry) {
-            onActivate(bestEntry)
-            try {
-              window.history.replaceState(null, '', `/entry/${bestEntry.slug}`)
-            } catch {
-              // ignore
-            }
+            throttledActivate(bestEntry)
+            throttledReplaceState(bestEntry.slug)
           }
         }
       })
@@ -241,12 +234,12 @@ const MobileTxtView = forwardRef<MobileTxtViewHandle, Props>(function MobileTxtV
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, onActivate])
+  }, [entries, throttledActivate, throttledReplaceState])
 
   return (
     <div ref={scrollRef} className={styles.root}>
-      {loopedEntries.map(({ entry, copy }) => {
-        const key = `${entry.id}-${copy}`
+      {entries.map((entry) => {
+        const key = String(entry.id)
         const isActive = entry.id === activeEntryId
 
         return (
