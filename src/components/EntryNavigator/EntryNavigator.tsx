@@ -53,7 +53,7 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
   const setActiveEntry = useCallback((entry: EntryDetail) => {
     if (entry.id === currentEntryRef.current.id) return
     setCurrentEntry(entry)
-    history.replaceState(null, '', `/entry/${entry.slug}`)
+    // URL sync is handled by the scroll views (throttled) — no replaceState here
   }, [])
 
   // Empty database — nothing to render yet
