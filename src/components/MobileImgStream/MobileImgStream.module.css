@@ -57,6 +57,13 @@
   background: #efefea;
 }
 
+/* Multi-image entries: disable native touch handling on the image so
+   diagonal swipes are captured by JS instead of triggering scroll.
+   Vertical movement is forwarded to the scroll container manually. */
+.imageWrapMulti {
+  touch-action: none;
+}
+
 /* The image fills the wrapper */
 .image {
   display: block;

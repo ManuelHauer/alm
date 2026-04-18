@@ -60,9 +60,10 @@ type SlotProps = {
   nearViewport: boolean
   slotRef: (el: HTMLDivElement | null) => void
   onSelectEntry: (entry: EntryDetail) => void
+  scrollContainer: React.RefObject<HTMLDivElement | null>
 }
 
-function Slot({ entry, isActive, nearViewport, slotRef, onSelectEntry }: SlotProps) {
+function Slot({ entry, isActive, nearViewport, slotRef, onSelectEntry, scrollContainer }: SlotProps) {
   const hasImages = entry.images.length > 0
   const hasMultipleImages = entry.images.length > 1
   const [imageIndex, setImageIndex] = useState(0)
@@ -71,6 +72,7 @@ function Slot({ entry, isActive, nearViewport, slotRef, onSelectEntry }: SlotPro
   const [isCarouselAnimating, setIsCarouselAnimating] = useState(false)
   const isAnimatingRef = useRef(false)
   const lockedAxis = useRef<'h' | 'v' | null>(null)
+  const prevMy = useRef(0)
 
   // Reset carousel when entry changes (shouldn't happen since these are fixed
   // slots, but safety net for future)
@@ -113,7 +115,10 @@ function Slot({ entry, isActive, nearViewport, slotRef, onSelectEntry }: SlotPro
         onSelectEntry(entry)
         return
       }
-      if (first) lockedAxis.current = null
+      if (first) {
+        lockedAxis.current = null
+        prevMy.current = 0
+      }
 
       if (lockedAxis.current === null) {
         if (Math.abs(mx) > AXIS_LOCK_PX || Math.abs(my) > AXIS_LOCK_PX) {
@@ -128,8 +133,13 @@ function Slot({ entry, isActive, nearViewport, slotRef, onSelectEntry }: SlotPro
         if (!last) setImageDragOffset(mx)
         else if (Math.abs(mx) > SWIPE_COMMIT_PX) commitSwipe(mx < 0 ? 1 : -1)
         else snapBack()
+      } else if (lockedAxis.current === 'v' && hasMultipleImages) {
+        // Manual vertical scroll for multi-image slots (touch-action: none
+        // on imageWrap prevents native scroll, so we forward it here)
+        const delta = my - prevMy.current
+        prevMy.current = my
+        scrollContainer.current?.scrollBy(0, -delta)
       }
-      // 'v' — do nothing, native scroll takes over
     },
     { filterTaps: true, pointer: { touch: true } },
   )
@@ -152,7 +162,7 @@ function Slot({ entry, isActive, nearViewport, slotRef, onSelectEntry }: SlotPro
       {hasImages ? (
         <>
           <div
-            className={styles.imageWrap}
+            className={`${styles.imageWrap} ${hasMultipleImages ? styles.imageWrapMulti : ''}`}
             style={aspectRatio ? { aspectRatio: String(aspectRatio) } : undefined}
           >
             {nearViewport ? (
@@ -405,6 +415,7 @@ const MobileImgStream = forwardRef<MobileImgStreamHandle, Props>(function Mobile
               }
             }}
             onSelectEntry={onSelectEntry}
+            scrollContainer={scrollRef}
           />
         )
       })}
