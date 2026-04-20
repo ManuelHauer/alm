@@ -22,6 +22,9 @@ export const metadata: Metadata = {
     siteName: 'alm project',
     type: 'website',
   },
+  ...(process.env.ALM_NOINDEX === '1' && {
+    robots: { index: false, follow: false },
+  }),
 }
 
 // Force dynamic rendering so next build never tries to pre-render pages
