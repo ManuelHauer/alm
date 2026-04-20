@@ -2,6 +2,7 @@ import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 
 import MobileNavRail from '@/components/MobileNavRail/MobileNavRail'
+import { getSiteSettings } from '@/lib/getSiteSettings'
 import type { FolioItem } from '../../api/folios/route'
 import type { Media } from '@/payload-types'
 import type { EntryIndexItem } from '@/types/entry'
@@ -17,7 +18,7 @@ export default async function SearchPage() {
   const payload = await getPayload({ config: configPromise })
 
   // Load all entries and folios server-side for initial render
-  const [entriesResult, foliosResult] = await Promise.all([
+  const [entriesResult, foliosResult, siteSettings] = await Promise.all([
     payload.find({
       collection: 'entries',
       depth: 1,
@@ -31,6 +32,7 @@ export default async function SearchPage() {
       sort: 'sortOrder',
       limit: 100,
     }),
+    getSiteSettings().catch(() => null),
   ])
 
   const entries: EntryIndexItem[] = entriesResult.docs.map((entry) => {
@@ -59,7 +61,7 @@ export default async function SearchPage() {
 
   return (
     <div className={styles.page}>
-      <MobileNavRail />
+      <MobileNavRail shopUrl={siteSettings?.shopUrl ?? null} instagramUrl={siteSettings?.instagramUrl ?? null} />
       <SearchView initialEntries={entries} folios={folios} />
     </div>
   )

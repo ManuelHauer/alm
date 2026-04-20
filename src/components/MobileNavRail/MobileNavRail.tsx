@@ -18,9 +18,17 @@ import styles from './MobileNavRail.module.css'
  * Uses vertical-rl writing mode + 180deg rotation so labels read
  * bottom-to-top, matching the editorial side-nav convention.
  */
-type Props = { desktop?: boolean }
+type Props = {
+  desktop?: boolean
+  shopUrl?: string | null
+  instagramUrl?: string | null
+}
 
-export default function MobileNavRail({ desktop = false }: Props) {
+export default function MobileNavRail({
+  desktop = false,
+  shopUrl,
+  instagramUrl = 'https://instagram.com/almproject',
+}: Props) {
   return (
     <aside className={`${styles.root} ${desktop ? styles.rootDesktop : ''}`}>
       <Link href="/" className={styles.logo} aria-label="alm — home">
@@ -37,17 +45,21 @@ export default function MobileNavRail({ desktop = false }: Props) {
         <a href="/studio" className={styles.link}>
           STUDIO
         </a>
-        <a href="/shop" className={styles.link}>
-          SHOP
-        </a>
-        <a
-          href="https://instagram.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={styles.link}
-        >
-          INSTAGRAM
-        </a>
+        {shopUrl && (
+          <a href={shopUrl} target="_blank" rel="noopener noreferrer" className={styles.link}>
+            SHOP
+          </a>
+        )}
+        {instagramUrl && (
+          <a
+            href={instagramUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.link}
+          >
+            INSTAGRAM
+          </a>
+        )}
       </nav>
     </aside>
   )

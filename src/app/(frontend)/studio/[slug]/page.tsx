@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import { notFound } from 'next/navigation'
 
 import MobileNavRail from '@/components/MobileNavRail/MobileNavRail'
+import { getSiteSettings } from '@/lib/getSiteSettings'
 import RichText from '@/components/RichText/RichText'
 import type { Media } from '@/payload-types'
 
@@ -47,12 +48,10 @@ export default async function StudioSubPage({ params }: Props) {
   const { slug } = await params
   const payload = await getPayload({ config: configPromise })
 
-  const { docs } = await payload.find({
-    collection: 'studio-pages',
-    where: { pageSlug: { equals: slug } },
-    depth: 1,
-    limit: 1,
-  })
+  const [{ docs }, siteSettings] = await Promise.all([
+    payload.find({ collection: 'studio-pages', where: { pageSlug: { equals: slug } }, depth: 1, limit: 1 }),
+    getSiteSettings().catch(() => null),
+  ])
 
   const page = docs[0]
   if (!page) notFound()
@@ -64,7 +63,7 @@ export default async function StudioSubPage({ params }: Props) {
 
   return (
     <div className={styles.page}>
-      <MobileNavRail />
+      <MobileNavRail shopUrl={siteSettings?.shopUrl ?? null} instagramUrl={siteSettings?.instagramUrl ?? null} />
       <div className={styles.root}>
       <div className={styles.content}>
         <Link href="/studio" className={styles.back}>← Studio</Link>

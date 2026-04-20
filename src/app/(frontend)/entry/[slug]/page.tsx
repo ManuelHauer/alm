@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 
 import EntryNavigator from '@/components/EntryNavigator/EntryNavigator'
 import { getAllEntries } from '@/lib/getEntries'
+import { getSiteSettings } from '@/lib/getSiteSettings'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -57,5 +58,15 @@ export default async function EntryPage({ params, searchParams }: Props) {
   const entries = await getAllEntries()
   if (!entries.find((e) => e.slug === slug)) notFound()
 
-  return <EntryNavigator entries={entries} initialSlug={slug} showBack={from === 'search'} />
+  let shopUrl: string | null = null
+  let instagramUrl: string | null = null
+  try {
+    const siteSettings = await getSiteSettings()
+    shopUrl = siteSettings.shopUrl ?? null
+    instagramUrl = siteSettings.instagramUrl ?? null
+  } catch {
+    // DB unavailable — use defaults
+  }
+
+  return <EntryNavigator entries={entries} initialSlug={slug} showBack={from === 'search'} shopUrl={shopUrl} instagramUrl={instagramUrl} />
 }

@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import { notFound } from 'next/navigation'
 
 import MobileNavRail from '@/components/MobileNavRail/MobileNavRail'
+import { getSiteSettings } from '@/lib/getSiteSettings'
 import styles from './studio.module.css'
 
 export const metadata = {
@@ -14,17 +15,16 @@ export const metadata = {
 export default async function StudioOverviewPage() {
   const payload = await getPayload({ config: configPromise })
 
-  const { docs } = await payload.find({
-    collection: 'studio-pages',
-    sort: 'sortOrder',
-    limit: 100,
-  })
+  const [{ docs }, siteSettings] = await Promise.all([
+    payload.find({ collection: 'studio-pages', sort: 'sortOrder', limit: 100 }),
+    getSiteSettings().catch(() => null),
+  ])
 
   if (!docs.length) notFound()
 
   return (
     <div className={styles.page}>
-      <MobileNavRail />
+      <MobileNavRail shopUrl={siteSettings?.shopUrl ?? null} instagramUrl={siteSettings?.instagramUrl ?? null} />
       <div className={styles.root}>
         <div className={styles.content}>
           <h1 className={styles.pageTitle}>Studio</h1>

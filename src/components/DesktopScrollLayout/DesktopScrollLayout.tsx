@@ -30,6 +30,8 @@ type Props = {
   entries: EntryDetail[]
   initialSlug?: string
   showBack?: boolean
+  shopUrl?: string | null
+  instagramUrl?: string | null
 }
 
 const wrapIdx = (i: number, len: number): number => ((i % len) + len) % len
@@ -39,7 +41,7 @@ const CAROUSEL_RESET_DELAY = 330
 // iOS-style easing: gentle acceleration in, fast mid, gentle deceleration out
 const CAROUSEL_EASING = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
 
-export default function DesktopScrollLayout({ entries, initialSlug, showBack = false }: Props) {
+export default function DesktopScrollLayout({ entries, initialSlug, showBack = false, shopUrl, instagramUrl }: Props) {
   const [focusedId, setFocusedId] = useState<number>(() => {
     if (initialSlug) {
       const match = entries.find((e) => e.slug === initialSlug)
@@ -324,7 +326,7 @@ export default function DesktopScrollLayout({ entries, initialSlug, showBack = f
   return (
     <div className={styles.root}>
       {/* ── 1. Nav rail ─────────────────────────────────────────── */}
-      <MobileNavRail desktop />
+      <MobileNavRail desktop shopUrl={shopUrl} instagramUrl={instagramUrl} />
 
       {/* ── 2. Image column ─────────────────────────────────────── */}
       <aside

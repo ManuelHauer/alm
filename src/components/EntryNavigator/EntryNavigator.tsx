@@ -27,9 +27,11 @@ type Props = {
   entries: EntryDetail[]
   initialSlug?: string
   showBack?: boolean
+  shopUrl?: string | null
+  instagramUrl?: string | null
 }
 
-export default function EntryNavigator({ entries, initialSlug, showBack = false }: Props) {
+export default function EntryNavigator({ entries, initialSlug, showBack = false, shopUrl, instagramUrl }: Props) {
   // null = not yet measured (SSR / first paint). Prevents desktop flash on mobile.
   const [isMobile, setIsMobile] = useState<boolean | null>(null)
   const [imgTxtView, setImgTxtView] = useState<'img' | 'txt'>('img')
@@ -70,7 +72,7 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
   if (isMobile) {
     return (
       <div className={styles.mobileRoot}>
-        <MobileNavRail />
+        <MobileNavRail shopUrl={shopUrl} instagramUrl={instagramUrl} />
 
         <div className={styles.mobileMain} role="region" aria-label="Entry viewer">
           {imgTxtView === 'img' ? (
@@ -126,5 +128,5 @@ export default function EntryNavigator({ entries, initialSlug, showBack = false 
   }
 
   // ── Desktop layout — DesktopScrollLayout is self-contained ─────────
-  return <DesktopScrollLayout entries={entries} initialSlug={initialSlug} showBack={showBack} />
+  return <DesktopScrollLayout entries={entries} initialSlug={initialSlug} showBack={showBack} shopUrl={shopUrl} instagramUrl={instagramUrl} />
 }
