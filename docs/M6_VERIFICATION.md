@@ -1,9 +1,9 @@
 # M6 Verification Report
 
 **Milestone:** M6 — Production Deploy
-**Status:** 🟡 In progress — app live, content loaded, DNS cutover pending
+**Status:** 🟡 In progress — app live, content loaded, frontend polish ongoing, DNS cutover pending
 **Date started:** 2026-04-14
-**Last updated:** 2026-04-15
+**Last updated:** 2026-04-20
 **Repo:** https://github.com/ManuelHauer/alm
 
 ---
@@ -60,6 +60,34 @@
 
 ---
 
+## 3b. Post-2026-04-15 polish (staging iteration)
+
+Work shipped to the staging IP (`http://5.78.205.65`) between 2026-04-15 and
+2026-04-20 while fixing frontend issues surfaced on the live deploy.
+
+| Fix / feature | Commit | Notes |
+|---|---|---|
+| Mobile IMG view rebuilt as continuous scroll stream | `13b7f81` | Replaces paged carousel on mobile IMG |
+| Prevent horizontal scroll in mobile IMG stream | `7bd518a` | |
+| Contain carousel overflow at slot level | `8e201d1` | Follow-up to horizontal-scroll fix |
+| ALMANAC nav link in left rail | `ddfbcf7` | |
+| Wrong-entry-on-tap bug + IMG stream gap → 130px | `7e95ae3` | |
+| Fix OOM crash on fast scroll (IMG + TXT views) | `3ce91c2` | |
+| IMG/TXT toggle redesign — orange pill + white circle | `c5e465e` | |
+| Mode-switch recentring, desktop flash prevention, Vialog font, logo gap | `dd98f32` | |
+| Toggle gradient, easier diagonal swipe, stable desktop resize focus | `66e6f35` | |
+| Desktop resize focus, divider gap, radial corner gradients | `3d85aba` | |
+| Prevent diagonal swipes from scrolling instead of advancing carousel | `b460a4f` | |
+| **Scroll-perf merge** — single-copy scroll, throttled activate + `replaceState`, memo Slot | `c4e31d7` / `dce221e` | **Closes M3 tradeoff #1** — desktop URL now updates on scroll |
+| Staging noindex gate (`ALM_NOINDEX` env flag) | `5b9774e` | Set `ALM_NOINDEX=1` in Coolify Production env to keep `http://5.78.205.65` out of search until DNS cutover |
+
+**Untracked e2e tests (WIP, not yet committed):**
+- `tests/e2e/mobile-stream.e2e.spec.ts`
+- `tests/e2e/prod-img-stream.e2e.spec.ts`
+- `tests/e2e/tap-accuracy.e2e.spec.ts`
+
+---
+
 ## 4. M6 remaining checklist
 
 ### 4.1 DNS cutover (blocking everything else)
@@ -70,6 +98,7 @@
 | SSL/TLS provisioned | ⬜ | Coolify provisions Let's Encrypt automatically once DNS points |
 | GitHub webhook updated HTTP → HTTPS | ⬜ | **Must do after SSL is live** — update webhook URL in GitHub repo → Settings → Webhooks; re-enable SSL verification |
 | `NEXT_PUBLIC_SERVER_URL` confirmed | ⬜ | Currently `https://almproject.com` in Coolify build args — correct, but verify after cutover |
+| `ALM_NOINDEX=1` set in Coolify Production | ⬜ | Keeps the raw-IP staging out of search until DNS cuts over. **Remove this env var when you want Google to index the site.** |
 
 ### 4.2 Post-cutover verification
 

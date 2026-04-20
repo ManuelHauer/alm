@@ -6,7 +6,7 @@
 > **For AI agents:** Read this entire file before writing any code.
 > Then read `docs/M3_STATUS.md` for the current UI component inventory.
 >
-> Last updated: 2026-04-13 | M1 ✅ M2 ✅ M3 ✅ M4 ✅ M5 ✅ M6 ⬜
+> Last updated: 2026-04-20 | M1 ✅ M2 ✅ M3 ✅ M4 ✅ M5 ✅ M6 🟡 (staging live, DNS cutover + ops pending)
 
 ---
 
@@ -628,24 +628,30 @@ on PATCH/PUT/DELETE. Use `api/entries/by-slug/[slug]` for slug-based lookups.
 
 ---
 
-### M6: Deployment + WordPress Migration — ⬜ NOT STARTED
+### M6: Deployment + WordPress Migration — 🟡 IN PROGRESS
 
-**Goal:** Live on staging, all ~130 entries migrated from WordPress.
+**Status:** Staging live at `http://5.78.205.65`. Content migrated. Frontend polish
+ongoing. DNS cutover + ops backups still pending. See `docs/M6_VERIFICATION.md`
+for the full checklist.
 
-**Tasks:**
-1. `Dockerfile`: multi-stage Next.js + Payload build.
-2. `docker-compose.yml`: next-payload + postgres + media volume.
-3. Deploy to Hetzner VPS via Coolify.
-4. Cloudflare: DNS, SSL, cache `/media/*` aggressively.
-5. WordPress migration (`scripts/migrate-wp.ts`):
-   - Read WP XML export
-   - Convert HTML → plaintext for `plainDescription`; store as single Lexical paragraph in `description`
-   - Download images from WP uploads → upload via Payload Local API
-   - Entry numbers by date (oldest = 1)
-   - Publish all migrated entries
-6. QA with Alm. Backup cron: daily `pg_dump` + media rsync to Hetzner Storage Box.
+**Done:**
+- Hetzner CPX31 + Coolify + managed Postgres + persistent media volume
+- Coolify auto-deploy on push to `main`
+- `prodMigrations` wired; initial schema + media-folders migrations
+- WP XML migration: 172 entries, ~620 media items, `entryNumber` 1–220
+- 11 studio entries scraped from almproject.com
+- Cold-boot 500, empty-entries SSR crash, shuffle mode, desktop/mobile UX fixes,
+  intro reload flash, search autofocus, admin folio picker — all shipped
 
-**Note:** WordPress export not yet available. Alm must provide XML export + media access.
+**Remaining (blocking go-live):**
+1. DNS cutover: `almproject.com` → `5.78.205.65` (WordPress still live — coordinate with Alm)
+2. SSL/TLS via Coolify (auto once DNS points)
+3. Update GitHub webhook to HTTPS, re-enable SSL verification
+4. Post-cutover smoke test (homepage, entry, search, studio, admin, uploads, OG images)
+5. Nightly `pg_dump` + media rsync to Hetzner Storage Box; tested restore
+
+**Note:** While DNS hasn't cut over, the staging IP is gated by the `ALM_NOINDEX=1`
+env flag in Coolify to keep `http://5.78.205.65` out of search results.
 
 ---
 
